@@ -20,6 +20,8 @@
 #import <Cordova/CDVPlugin.h>
 #import <Cordova/CDVInvokedUrlCommand.h>
 #import <Cordova/CDVScreenOrientationDelegate.h>
+#import "CDVInAppBrowser.h"
+
 
 #ifdef __CORDOVA_4_0_0
     #import <Cordova/CDVUIWebViewDelegate.h>
@@ -62,7 +64,7 @@
 
 @class CDVThemeableBrowserViewController;
 
-@interface CDVThemeableBrowser : CDVPlugin {
+@interface CDVThemeableBrowser : CDVInAppBrowser {
     BOOL _injectedIframeBridge;
 }
 

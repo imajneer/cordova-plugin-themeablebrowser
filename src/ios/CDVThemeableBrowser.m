@@ -60,13 +60,28 @@
 
 #pragma mark CDVThemeableBrowser
 
+
+
 @interface CDVThemeableBrowser () {
     BOOL _isShown;
 }
 @end
 
+
 @implementation CDVThemeableBrowser
 
+@synthesize callbackId = _callbackId;
+@synthesize callbackIdPattern = _callbackIdPattern;
+
+#ifdef __CORDOVA_4_0_0
+- (void)pluginInitialize
+{
+    if (self != nil) {
+        _isShown = NO;
+        _callbackIdPattern = nil;
+    }
+}
+#else
 - (CDVThemeableBrowser*)initWithWebView:(UIWebView*)theWebView
 {
     self = [super initWithWebView:theWebView];
@@ -77,6 +92,7 @@
 
     return self;
 }
+#endif
 
 - (void)onReset
 {
@@ -105,6 +121,7 @@
 
 - (void)open:(CDVInvokedUrlCommand*)command
 {
+    NSLog(@"trying to open item in browser");
     CDVPluginResult* pluginResult;
 
     NSString* url = [command argumentAtIndex:0];
@@ -317,16 +334,7 @@
 
 - (void)openInCordovaWebView:(NSURL*)url withOptions:(NSString*)options
 {
-    if ([self.commandDelegate URLIsWhitelisted:url]) {
-        NSURLRequest* request = [NSURLRequest requestWithURL:url];
-#ifdef __CORDOVA_4_0_0
-        [self.webViewEngine loadRequest:request];
-#else
-        [self.webView loadRequest:request];
-#endif
-    } else { // this assumes the ThemeableBrowser can be excepted from the white-list
-        [self openInThemeableBrowser:url withOptions:options];
-    }
+    [super openInCordovaWebView:url withOptions:options];
 }
 
 - (void)openInSystem:(NSURL*)url
@@ -596,6 +604,10 @@
     }
 
     return self;
+}
+
+-(BOOL)prefersStatusBarHidden {
+    return YES;
 }
 
 - (void)createViews
