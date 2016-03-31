@@ -20,14 +20,14 @@
 
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
            id="cordova-plugin-themeablebrowser"
-      version="0.2.13">
+      version="0.3.0">
 
     <name>ThemeableBrowser</name>
     <description>Cordova ThemeableBrowser Plugin</description>
     <license>Apache 2.0</license>
     <keywords>cordova,in,app,browser,themeablebrowser</keywords>
-    <repo>https://github.com/initialxy/cordova-plugin-themeablebrowser.git</repo>
-    <issue>https://github.com/initialxy/cordova-plugin-themeablebrowser/issues</issue>
+    <repo>https://github.com/imajneer/cordova-plugin-themeablebrowser.git</repo>
+    <issue>https://github.com/imajneer/cordova-plugin-themeablebrowser/issues</issue>
 
     <engines>
       <engine name="cordova" version=">=3.1.0" />
@@ -63,7 +63,9 @@
 
         <header-file src="src/ios/CDVThemeableBrowser.h" />
         <source-file src="src/ios/CDVThemeableBrowser.m" />
-
+        <header-file src="src/ios/CDVInAppBrowser.h" />
+        <source-file src="src/ios/CDVInAppBrowser.m" />
+        
         <framework src="CoreGraphics.framework" />
     </platform>
 </plugin>
