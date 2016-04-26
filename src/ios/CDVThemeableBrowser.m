@@ -826,8 +826,9 @@
         [self.titleButton addTarget:self action:@selector(goBack:) forControlEvents:UIControlEventTouchUpInside];
         [self.titleButton setAlpha:0.1];
         self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(10, 0, 10, toolbarHeight)];
-        self.titleLabel.textAlignment = NSTextAlignmentCenter;
+        self.titleLabel.textAlignment = NSTextAlignmentLeft;
         self.titleLabel.numberOfLines = 1;
+        [self.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
         self.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
         self.titleLabel.textColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.title withKey:kThemeableBrowserPropColor withDefault:@"#000000ff"]];
         
