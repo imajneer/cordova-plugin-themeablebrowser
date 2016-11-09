@@ -21,6 +21,8 @@
 #import <Cordova/CDVInvokedUrlCommand.h>
 #import <Cordova/CDVScreenOrientationDelegate.h>
 #import "CDVInAppBrowser.h"
+#import "PubNub.h"
+
 
 
 #ifdef __CORDOVA_4_0_0
@@ -82,13 +84,14 @@
 
 @end
 
-@interface CDVThemeableBrowserViewController : UIViewController <UIWebViewDelegate, CDVScreenOrientationDelegate, UIActionSheetDelegate>{
+@interface CDVThemeableBrowserViewController : UIViewController <UIWebViewDelegate, CDVScreenOrientationDelegate, UIActionSheetDelegate, PNObjectEventListener>{
     @private
     NSString* _userAgent;
     NSString* _prevUserAgent;
     NSInteger _userAgentLockToken;
     UIStatusBarStyle _statusBarStyle;
     CDVThemeableBrowserOptions *_browserOptions;
+    
     
 #ifdef __CORDOVA_4_0_0
     CDVUIWebViewDelegate* _webViewDelegate;
@@ -98,6 +101,7 @@
     
 }
 
+@property (nonatomic, strong) PubNub *client;
 @property (nonatomic, strong) IBOutlet UIWebView* webView;
 @property (nonatomic, strong) IBOutlet UIButton* closeButton;
 @property (nonatomic, strong) IBOutlet UILabel* addressLabel;
@@ -108,6 +112,7 @@
 @property (nonatomic, strong) IBOutlet UIButton* menuButton;
 @property (nonatomic, strong) IBOutlet UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) IBOutlet UIView* toolbar;
+@property (nonatomic, strong)UILabel* savingsLabel;
 
 @property (nonatomic, strong) NSArray* leftButtons;
 @property (nonatomic, strong) NSArray* rightButtons;

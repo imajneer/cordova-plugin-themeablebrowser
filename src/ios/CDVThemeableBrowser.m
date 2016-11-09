@@ -88,6 +88,7 @@
     if (self != nil) {
         _isShown = NO;
         _callbackIdPattern = nil;
+        
     }
     
     return self;
@@ -456,6 +457,8 @@
  */
 - (BOOL)webView:(UIWebView*)theWebView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
 {
+    NSLog(@"just loaded webview with request: %@",request.URL.absoluteString);
+    NSLog(@"just loaded webview with navigation type: %l",navigationType);
     NSURL* url = request.URL;
     BOOL isTopLevelNavigation = [request.URL isEqual:[request mainDocumentURL]];
     
@@ -600,6 +603,17 @@
 #endif
         _navigationDelegate = navigationDelegate;
         _statusBarStyle = statusBarStyle;
+        PNConfiguration *configuration = [PNConfiguration configurationWithPublishKey:@"pub-c-094b2656-363b-4889-8581-51d2d7756848" subscribeKey:@"sub-c-618210c4-9d76-11e6-949a-02ee2ddab7fe"];
+        _client = [PubNub clientWithConfiguration:configuration];
+        [_client addListener:self];
+        NSUserDefaults *myDefaults = [[NSUserDefaults standardUserDefaults]
+                                      initWithSuiteName:@"group.price.app"];
+        
+        NSInteger userId = [myDefaults integerForKey:@"user_id"];
+        NSLog(@"got user ID: %ld",userId);
+        [self.client subscribeToChannels: @[[NSString stringWithFormat:@"%ld",userId]] withPresence:YES];
+        
+        
         [self createViews];
     }
     
@@ -844,6 +858,18 @@
     [self.view addSubview:self.toolbar];
     // [self.view addSubview:self.addressLabel];
     // [self.view addSubview:self.spinner];
+    
+    UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(self.view.frame)-60, CGRectGetWidth(self.view.frame), 60)];
+    [footerView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+    _savingsLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), 40)];
+    [_savingsLabel setTextAlignment:NSTextAlignmentCenter];
+    [self.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
+    [_savingsLabel setTextColor:[UIColor whiteColor]];
+    [_savingsLabel setText:@"Loading..."];
+    [footerView addSubview:_savingsLabel];
+    //        [theWebView addSubview:footerView];
+//    [_savingsLabel setCenter:footerView.center];
+    [self.view addSubview:footerView];
 }
 
 /**
@@ -984,6 +1010,36 @@
     // NSMutableArray* items = [self.toolbar.items mutableCopy];
     // [items replaceObjectAtIndex:0 withObject:self.closeButton];
     // [self.toolbar setItems:items];
+}
+
+- (void)client:(PubNub *)client didReceiveMessage:(PNMessageResult *)message {
+    
+    // Handle new message stored in message.data.message
+    if (![message.data.channel isEqualToString:message.data.subscription]) {
+        
+        // Message has been received on channel group stored in message.data.subscription.
+    }
+    else {
+        
+        // Message has been received on channel stored in message.data.channel.
+    }
+    if([[message.data.message objectForKey:@"msg_type"] isEqualToString:@"refresh"]) return;
+    
+    NSString *bestPrice = [message.data.message objectForKey:@"best_price"];
+    NSString *price = [message.data.message objectForKey:@"price"];
+    id points = [message.data.message objectForKey:@"points"];
+    
+//    NSLog(@"got item with type: %@",NSStringFromClass(points.class));
+    NSLog(@"best price: %@",bestPrice);
+    NSLog(@"price: %@",price);
+    NSLog(@"price: %@",points);
+    float savings = price.doubleValue - bestPrice.doubleValue;
+    if(savings > 1) {
+        [_savingsLabel setText:[NSString stringWithFormat:@"Savings: $%.02f",savings]];
+    } else [_savingsLabel setText:[NSString stringWithFormat:@"Points: %@",points]];
+    
+    NSLog(@"Received message: %@ on channel %@ at %@", message.data.message,
+          message.data.channel, message.data.timetoken);
 }
 
 - (void)showLocationBar:(BOOL)show
@@ -1379,6 +1435,7 @@
 
 - (BOOL)webView:(UIWebView*)theWebView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
 {
+    [_savingsLabel setText:@"Loading..."];
     BOOL isTopLevelNavigation = [request.URL isEqual:[request mainDocumentURL]];
     
     if (isTopLevelNavigation) {
@@ -1393,7 +1450,7 @@
 - (void)webViewDidFinishLoad:(UIWebView*)theWebView
 {
     // update url, stop spinner, update back/forward
-    
+    [_savingsLabel setText:@"Searching for best price on the web..."];
     self.addressLabel.text = [self.currentURL absoluteString];
     [self updateButton:theWebView];
     

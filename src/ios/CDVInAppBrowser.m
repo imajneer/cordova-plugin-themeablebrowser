@@ -194,6 +194,13 @@
         self.inAppBrowserViewController.webView.keyboardDisplayRequiresUserAction = browserOptions.keyboarddisplayrequiresuseraction;
         self.inAppBrowserViewController.webView.suppressesIncrementalRendering = browserOptions.suppressesincrementalrendering;
     }
+    UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(self.inAppBrowserViewController.webView.frame)-150, CGRectGetWidth(self.inAppBrowserViewController.webView.frame), 150)];
+    [footerView setBackgroundColor:[UIColor cyanColor]];
+    UILabel *textLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 200, 100)];
+    [textLabel setText:@"some text goes here!"];
+    [footerView addSubview:textLabel];
+    //        [theWebView addSubview:footerView];
+    [self.inAppBrowserViewController.webView addSubview:footerView];
 
     [self.inAppBrowserViewController navigateTo:url];
     if (!browserOptions.hidden) {
