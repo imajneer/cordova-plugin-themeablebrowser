@@ -99,7 +99,14 @@
 {
     [self close:nil];
 }
+-(void)foundProduct:(CDVInvokedUrlCommand*)command {
+    NSLog(@"got thing: %@",[command.arguments objectAtIndex:0]);
+    [self.themeableBrowserViewController foundProductWithSavings:[[command.arguments objectAtIndex:0] floatValue] andPoints:[[command.arguments objectAtIndex:1] intValue]];
+}
 
+-(void)gotStatusCode:(CDVInvokedUrlCommand *)command {
+    [self.themeableBrowserViewController gotStatusCode:[[command.arguments objectAtIndex:0] intValue]];
+}
 - (void)close:(CDVInvokedUrlCommand*)command
 {
     if (self.themeableBrowserViewController == nil) {
@@ -506,6 +513,7 @@
 
 - (void)webViewDidFinishLoad:(UIWebView*)theWebView
 {
+    
     if (self.callbackId != nil) {
         // TODO: It would be more useful to return the URL the page is actually on (e.g. if it's been redirected).
         NSString* url = [self.themeableBrowserViewController.currentURL absoluteString];
@@ -603,15 +611,6 @@
 #endif
         _navigationDelegate = navigationDelegate;
         _statusBarStyle = statusBarStyle;
-        PNConfiguration *configuration = [PNConfiguration configurationWithPublishKey:@"pub-c-094b2656-363b-4889-8581-51d2d7756848" subscribeKey:@"sub-c-618210c4-9d76-11e6-949a-02ee2ddab7fe"];
-        _client = [PubNub clientWithConfiguration:configuration];
-        [_client addListener:self];
-        NSUserDefaults *myDefaults = [[NSUserDefaults standardUserDefaults]
-                                      initWithSuiteName:@"group.price.app"];
-        
-        NSInteger userId = [myDefaults integerForKey:@"user_id"];
-        NSLog(@"got user ID: %ld",userId);
-        [self.client subscribeToChannels: @[[NSString stringWithFormat:@"%ld",userId]] withPresence:YES];
         
         
         [self createViews];
@@ -1012,36 +1011,6 @@
     // [self.toolbar setItems:items];
 }
 
-- (void)client:(PubNub *)client didReceiveMessage:(PNMessageResult *)message {
-    
-    // Handle new message stored in message.data.message
-    if (![message.data.channel isEqualToString:message.data.subscription]) {
-        
-        // Message has been received on channel group stored in message.data.subscription.
-    }
-    else {
-        
-        // Message has been received on channel stored in message.data.channel.
-    }
-    if([[message.data.message objectForKey:@"msg_type"] isEqualToString:@"refresh"]) return;
-    
-    NSString *bestPrice = [message.data.message objectForKey:@"best_price"];
-    NSString *price = [message.data.message objectForKey:@"price"];
-    id points = [message.data.message objectForKey:@"points"];
-    
-//    NSLog(@"got item with type: %@",NSStringFromClass(points.class));
-    NSLog(@"best price: %@",bestPrice);
-    NSLog(@"price: %@",price);
-    NSLog(@"price: %@",points);
-    float savings = price.doubleValue - bestPrice.doubleValue;
-    if(savings > 1) {
-        [_savingsLabel setText:[NSString stringWithFormat:@"Savings: $%.02f",savings]];
-    } else [_savingsLabel setText:[NSString stringWithFormat:@"Points: %@",points]];
-    
-    NSLog(@"Received message: %@ on channel %@ at %@", message.data.message,
-          message.data.channel, message.data.timetoken);
-}
-
 - (void)showLocationBar:(BOOL)show
 {
     CGRect locationbarFrame = self.addressLabel.frame;
@@ -1164,6 +1133,8 @@
 
 - (void)viewDidLoad
 {
+    _inProduction = YES;
+    
     [super viewDidLoad];
 }
 
@@ -1419,11 +1390,48 @@
         }
     }
 }
+-(NSString*)hostUrl {
+    return _inProduction ? @"http://production12.getpriceapp.com" : @"http://staging12.getpriceapp.com";
+}
 
+-(NSURL*)reqUrl {
+    return [NSURL URLWithString:[NSString stringWithFormat:@"%@/v2/priceit?user_id=%ld&url=%@&source=app",self.hostUrl,_userId,_currentUrl]];
+}
+
+
+-(NSString*)textForStatusCode:(int)code {
+    switch(code) {
+        case 0:
+            return @"Search failed. Try another product.";
+        case 1:
+            return @"Searching for best price...";
+        case 2:
+            return @"Error... Please restart the app!";
+        case 3:
+            return @"Sorry! This store is not yet supported.";
+        default:
+            return @"Unknown error... Try again.";
+    }
+}
+
+- (void)foundProductWithSavings:(float)savings andPoints:(int)points {
+    if(savings)
+        [_savingsLabel setText:[NSString stringWithFormat:@"Savings: $%.02f",savings]];
+    else [_savingsLabel setText:[NSString stringWithFormat:@"Points: %i",points]];
+    
+}
+
+-(void)gotStatusCode:(int)statusCode {
+    [_savingsLabel setText:[self textForStatusCode:statusCode]];
+}
 #pragma mark UIWebViewDelegate
 
 - (void)webViewDidStartLoad:(UIWebView*)theWebView
 {
+    if(!_searching)
+        [_savingsLabel setText:@"Loading..."];
+    
+    
     // loading url, start spinner
     
     self.addressLabel.text = NSLocalizedString(@"Loading...", nil);
@@ -1433,9 +1441,11 @@
     return [self.navigationDelegate webViewDidStartLoad:theWebView];
 }
 
+-(void)doneSearching {
+    _searching = NO;
+}
 - (BOOL)webView:(UIWebView*)theWebView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
 {
-    [_savingsLabel setText:@"Loading..."];
     BOOL isTopLevelNavigation = [request.URL isEqual:[request mainDocumentURL]];
     
     if (isTopLevelNavigation) {
@@ -1450,7 +1460,6 @@
 - (void)webViewDidFinishLoad:(UIWebView*)theWebView
 {
     // update url, stop spinner, update back/forward
-    [_savingsLabel setText:@"Searching for best price on the web..."];
     self.addressLabel.text = [self.currentURL absoluteString];
     [self updateButton:theWebView];
     

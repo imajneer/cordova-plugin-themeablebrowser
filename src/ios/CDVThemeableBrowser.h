@@ -21,7 +21,6 @@
 #import <Cordova/CDVInvokedUrlCommand.h>
 #import <Cordova/CDVScreenOrientationDelegate.h>
 #import "CDVInAppBrowser.h"
-#import "PubNub.h"
 
 
 
@@ -77,10 +76,14 @@
 - (CDVThemeableBrowserOptions*)parseOptions:(NSString*)options;
 - (void)open:(CDVInvokedUrlCommand*)command;
 - (void)close:(CDVInvokedUrlCommand*)command;
+- (void)foundProduct:(CDVInvokedUrlCommand*)command;
 - (void)injectScriptCode:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command withAnimation:(BOOL)animated;
 - (void)reload:(CDVInvokedUrlCommand*)command;
+- (void)gotStatusCode:(CDVInvokedUrlCommand*)command;
+
+
 
 @end
 
@@ -101,7 +104,6 @@
     
 }
 
-@property (nonatomic, strong) PubNub *client;
 @property (nonatomic, strong) IBOutlet UIWebView* webView;
 @property (nonatomic, strong) IBOutlet UIButton* closeButton;
 @property (nonatomic, strong) IBOutlet UILabel* addressLabel;
@@ -116,6 +118,11 @@
 
 @property (nonatomic, strong) NSArray* leftButtons;
 @property (nonatomic, strong) NSArray* rightButtons;
+@property (nonatomic) BOOL searching, inProduction, sucess;
+@property (nonatomic) long userId;
+@property (nonatomic, strong)NSString *currentUrl;
+
+
 
 @property (nonatomic, weak) id <CDVScreenOrientationDelegate> orientationDelegate;
 @property (nonatomic, weak) CDVThemeableBrowser* navigationDelegate;
@@ -124,6 +131,8 @@
 
 - (void)close;
 - (void)reload;
+- (void)foundProductWithSavings:(float)savings andPoints:(int)points;
+- (void)gotStatusCode:(int)code;
 - (void)navigateTo:(NSURL*)url;
 - (void)showLocationBar:(BOOL)show;
 - (void)showToolBar:(BOOL)show : (NSString*) toolbarPosition;
