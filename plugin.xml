@@ -65,16 +65,6 @@
         <source-file src="src/ios/CDVThemeableBrowser.m" />
         <header-file src="src/ios/CDVInAppBrowser.h" />
         <source-file src="src/ios/CDVInAppBrowser.m" />
-        
-        <header-file src="src/ios/PubNub/Core/*.h" />
-        <source-file src="src/ios/PubNub/Core/*.m" />
-        
-        
-
-        <source-file src="src/ios/CDVThemeableBrowser.m" />
-        <header-file src="src/ios/CDVInAppBrowser.h" />
-        <source-file src="src/ios/CDVInAppBrowser.m" />
-
 
         <framework src="CoreGraphics.framework" />
     </platform>
