@@ -87,7 +87,7 @@
 
 @end
 
-@interface CDVThemeableBrowserViewController : UIViewController <UIWebViewDelegate, CDVScreenOrientationDelegate, UIActionSheetDelegate, PNObjectEventListener>{
+@interface CDVThemeableBrowserViewController : UIViewController <UIWebViewDelegate, CDVScreenOrientationDelegate, UIActionSheetDelegate>{
     @private
     NSString* _userAgent;
     NSString* _prevUserAgent;
