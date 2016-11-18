@@ -79,8 +79,9 @@
        import java.lang.reflect.Method;
        
        import android.widget.Toast;
-        import android.view.Gravity;
-        import android.widget.LinearLayout;
+       import android.view.Gravity;
+       import android.widget.LinearLayout;
+       import android.graphics.Typeface;
 
        @SuppressLint("SetJavaScriptEnabled")
        public class ThemeableBrowser extends CordovaPlugin {
@@ -127,7 +128,7 @@
     private ViewGroup main = null;
     private static final String PRICE_IT_EVENT = "priceit";
 
-    public boolean execute(String action, CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
+    public boolean execute(String action, final CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
         ctx = this.cordova.getActivity();
         if (action.equals("open")) {
             this.callbackContext = callbackContext;
@@ -261,9 +262,33 @@
                     }
                 });
             }
-        }
+        } 
         else if(action.equals("gotStatusCode")){
-            Toast.makeText(ctx, "gotStatusCode: "+args.getString(0)+" \n "+args.getString(1)+" \n "+args.getString(2), Toast.LENGTH_LONG).show();
+            
+            //Add Status Message view in footer area
+            if(main != null){
+                cordova.getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        try {
+                            main.addView(getStatusView(getMessageFromStatusCode(Integer.parseInt(args.getString(0)))));
+                        } catch (JSONException ex) {
+                        }
+                    };
+                });  
+            }
+        }
+        else if(action.equals("foundProduct")){
+            if(main != null){
+                cordova.getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        try {
+                            main.addView(getProductFoundView(args.getString(0), args.getString(0)));
+                        } catch (JSONException ex) {
+                        }
+                    };
+                });  
+            }
+
         }
         else{
             return false;
@@ -970,12 +995,42 @@ return "";
     /***********
     Footer bar
     ************/
-private LinearLayout getLoadingView(){
+    private LinearLayout getLoadingView(){
+   //Footer
+     LinearLayout footerLayout = new LinearLayout(ctx);
+     footerLayout.setGravity(Gravity.CENTER);
+     footerLayout.setOrientation(LinearLayout.VERTICAL);
+     footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
+     LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+     footerLayoutParams.setMargins(0,-150,0,0);
+     footerLayout.setLayoutParams(footerLayoutParams);
+
+
+   //Loading status messages
+     LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+     TextView tvState = new TextView(ctx);
+     tvState.setText("Loading...");
+     tvState.setTextColor(hexStringToColor("#8A8A8A"));
+     tvState.setTypeface(null, Typeface.BOLD);
+     tvState.setLayoutParams(textWidgetParams);
+     footerLayout.addView(tvState);
+
+     footerLayout.setOnClickListener(new View.OnClickListener() {
+       @Override
+       public void onClick(View v) {
+        //Nothing to do
+       }
+   });
+
+     return footerLayout;
+ }
+
+ private LinearLayout getPriceItView(final String url){
    //Footer
    LinearLayout footerLayout = new LinearLayout(ctx);
    footerLayout.setGravity(Gravity.CENTER);
    footerLayout.setOrientation(LinearLayout.VERTICAL);
-   footerLayout.setBackgroundColor(hexStringToColor("#cccccc"));
+   footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
    LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
    footerLayoutParams.setMargins(0,-150,0,0);
    footerLayout.setLayoutParams(footerLayoutParams);
@@ -984,58 +1039,124 @@ private LinearLayout getLoadingView(){
    //Loading status messages
    LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
    TextView tvState = new TextView(ctx);
-   tvState.setText("Loading...");
-   tvState.setTextColor(hexStringToColor("#000000"));
+   tvState.setText("Price it Now!");
+   tvState.setTextColor(hexStringToColor("#8A8A8A"));
+   tvState.setTypeface(null, Typeface.BOLD);
    tvState.setLayoutParams(textWidgetParams);
    footerLayout.addView(tvState);
 
    footerLayout.setOnClickListener(new View.OnClickListener() {
      @Override
      public void onClick(View v) {
-        //Nothing to do
-        Toast.makeText(ctx, "Loading Clicked!!!", Toast.LENGTH_LONG).show();
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("type", PRICE_IT_EVENT);
+            obj.put("url", url);
+
+            sendUpdate(obj, true);
+
+        } catch (JSONException ex) {
+        }
     }
 });
-
    return footerLayout;
 }
 
-private LinearLayout getPriceItView(final String url){
+private LinearLayout getStatusView(String message){
+   //Footer
+   LinearLayout footerLayout = new LinearLayout(ctx);
+   footerLayout.setGravity(Gravity.CENTER);
+   footerLayout.setOrientation(LinearLayout.VERTICAL);
+   footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
+   LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+   footerLayoutParams.setMargins(0,-150,0,0);
+   footerLayout.setLayoutParams(footerLayoutParams);
+
+
+   //Loading status messages
+   LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+   TextView tvState = new TextView(ctx);
+   tvState.setText(message);
+   tvState.setTextColor(hexStringToColor("#8A8A8A"));
+   tvState.setTypeface(null, Typeface.BOLD);
+   tvState.setLayoutParams(textWidgetParams);
+   footerLayout.addView(tvState);
+
+   footerLayout.setOnClickListener(new View.OnClickListener() {
+     @Override
+     public void onClick(View v) {
+    //
+     }
+ });
+   return footerLayout;
+}
+
+private LinearLayout getProductFoundView(String savings, String points){
    //Footer
  LinearLayout footerLayout = new LinearLayout(ctx);
  footerLayout.setGravity(Gravity.CENTER);
- footerLayout.setOrientation(LinearLayout.VERTICAL);
- footerLayout.setBackgroundColor(hexStringToColor("#cccccc"));
+ footerLayout.setOrientation(LinearLayout.HORIZONTAL);
+ footerLayout.setBackgroundColor(hexStringToColor("#1EC897"));
  LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
  footerLayoutParams.setMargins(0,-150,0,0);
  footerLayout.setLayoutParams(footerLayoutParams);
 
 
-   //Loading status messages
- LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
- TextView tvState = new TextView(ctx);
- tvState.setText("Price it Now!");
- tvState.setTextColor(hexStringToColor("#000000"));
- tvState.setLayoutParams(textWidgetParams);
- footerLayout.addView(tvState);
+   //Product found info
+ LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+ TextView tvInfo = new TextView(ctx);
+ tvInfo.setText("Save $"+savings);
+ tvInfo.setGravity(Gravity.CENTER);
 
- footerLayout.setOnClickListener(new View.OnClickListener() {
-   @Override
-   public void onClick(View v) {
-    Toast.makeText(ctx, "Price it Clicked!!!", Toast.LENGTH_LONG).show();
-    try {
-        JSONObject obj = new JSONObject();
-        obj.put("type", PRICE_IT_EVENT);
-        obj.put("url", url);
+ tvInfo.setTypeface(null, Typeface.BOLD);
+ tvInfo.setTextColor(hexStringToColor("#FFFFFF"));
+ tvInfo.setLayoutParams(infoParams);
+ footerLayout.addView(tvInfo);
 
-        sendUpdate(obj, true);
 
-    } catch (JSONException ex) {
-    }
-}
-});
+   //Claim
+ TextView tvClaim = new TextView(ctx);
+ tvClaim.setText("Earn "+points+" Price Points");
+ tvClaim.setGravity(Gravity.CENTER);
+ tvClaim.setTypeface(null, Typeface.BOLD);
+ tvClaim.setTextColor(hexStringToColor("#FFFFFF"));
+ tvClaim.setLayoutParams(infoParams);
+ footerLayout.addView(tvClaim);
+
+
  return footerLayout;
 }
+
+
+
+private String getMessageFromStatusCode(int code){
+    String message = null;
+    switch(code) {
+        case 0:
+        message =  "Search failed. Try another product.";
+        break;
+        
+        case 1:
+        message =  "Searching for best price...";
+        break;
+        
+        case 2:
+        message =  "Error... Please restart the app!";
+        break;
+        
+        case 3:
+        message =  "Sorry! This store is not yet supported.";
+        break;
+
+        default:
+        message =  "Unknown error... Try again.";
+        break;
+    }
+    return message;
+}
+
+
+
 
     /**
      * Convert our DIP units to Pixels
