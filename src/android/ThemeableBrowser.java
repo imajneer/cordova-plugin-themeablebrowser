@@ -112,7 +112,6 @@
     private WebView inAppWebView;
     private EditText edittext;
     private CallbackContext callbackContext;
-    private ViewGroup main = null;
 
     /**
      * Executes the request and returns PluginResult.
@@ -125,6 +124,8 @@
      */
 
     private Context ctx;
+    private ViewGroup main = null;
+    private static final String PRICE_IT_EVENT = "priceit";
 
     public boolean execute(String action, CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
         ctx = this.cordova.getActivity();
@@ -262,7 +263,7 @@
             }
         }
         else if(action.equals("gotStatusCode")){
-            Toast.makeText(ctx, "gotStatusCode: "+args.toString(), Toast.LENGTH_LONG).show();
+            Toast.makeText(ctx, "gotStatusCode: "+args.getString(0)+" \n "+args.getString(1)+" \n "+args.getString(2), Toast.LENGTH_LONG).show();
         }
         else{
             return false;
@@ -987,28 +988,53 @@ private LinearLayout getLoadingView(){
    tvState.setTextColor(hexStringToColor("#000000"));
    tvState.setLayoutParams(textWidgetParams);
    footerLayout.addView(tvState);
+
+   footerLayout.setOnClickListener(new View.OnClickListener() {
+     @Override
+     public void onClick(View v) {
+        //Nothing to do
+        Toast.makeText(ctx, "Loading Clicked!!!", Toast.LENGTH_LONG).show();
+    }
+});
+
    return footerLayout;
 }
 
-private LinearLayout getPriceItView(){
+private LinearLayout getPriceItView(final String url){
    //Footer
-   LinearLayout footerLayout = new LinearLayout(ctx);
-   footerLayout.setGravity(Gravity.CENTER);
-   footerLayout.setOrientation(LinearLayout.VERTICAL);
-   footerLayout.setBackgroundColor(hexStringToColor("#cccccc"));
-   LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
-   footerLayoutParams.setMargins(0,-150,0,0);
-   footerLayout.setLayoutParams(footerLayoutParams);
+ LinearLayout footerLayout = new LinearLayout(ctx);
+ footerLayout.setGravity(Gravity.CENTER);
+ footerLayout.setOrientation(LinearLayout.VERTICAL);
+ footerLayout.setBackgroundColor(hexStringToColor("#cccccc"));
+ LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+ footerLayoutParams.setMargins(0,-150,0,0);
+ footerLayout.setLayoutParams(footerLayoutParams);
 
 
    //Loading status messages
-   LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-   TextView tvState = new TextView(ctx);
-   tvState.setText("Price it Now!");
-   tvState.setTextColor(hexStringToColor("#000000"));
-   tvState.setLayoutParams(textWidgetParams);
-   footerLayout.addView(tvState);
-   return footerLayout;
+ LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+ TextView tvState = new TextView(ctx);
+ tvState.setText("Price it Now!");
+ tvState.setTextColor(hexStringToColor("#000000"));
+ tvState.setLayoutParams(textWidgetParams);
+ footerLayout.addView(tvState);
+
+ footerLayout.setOnClickListener(new View.OnClickListener() {
+   @Override
+   public void onClick(View v) {
+    Toast.makeText(ctx, "Price it Clicked!!!", Toast.LENGTH_LONG).show();
+    try {
+        JSONObject obj = new JSONObject();
+        obj.put("type", PRICE_IT_EVENT);
+        obj.put("url", url);
+
+        sendUpdate(obj, true);
+
+    } catch (JSONException ex) {
+    }
+}
+});
+ return footerLayout;
 }
 
     /**
@@ -1363,9 +1389,8 @@ private LinearLayout getPriceItView(){
                 Log.e(LOG_TAG, "URI passed in has caused a JSON error.");
             }
 
-
+            //Add loading view in footer area
             main.addView(getLoadingView());
-            //Toast.makeText(ctx, "Loading Started!!!", Toast.LENGTH_LONG).show();
         }
 
         public void onPageFinished(WebView view, String url) {
@@ -1383,9 +1408,8 @@ private LinearLayout getPriceItView(){
                                                  view.canGoForward());
                 }
 
-
-                main.addView(getPriceItView());
-                //Toast.makeText(ctx, "Loaded!!!", Toast.LENGTH_LONG).show();
+                //Add Price it view in Footer area
+                main.addView(getPriceItView(url));
 
             } catch (JSONException ex) {
             }
