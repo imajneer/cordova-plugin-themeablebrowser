@@ -82,6 +82,8 @@
        import android.view.Gravity;
        import android.widget.LinearLayout;
        import android.graphics.Typeface;
+       import android.widget.ImageView;
+       import com.LogicSquare.Price12.R;
 
        @SuppressLint("SetJavaScriptEnabled")
        public class ThemeableBrowser extends CordovaPlugin {
@@ -1038,12 +1040,20 @@ return "";
 
    //Loading status messages
    LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-   TextView tvState = new TextView(ctx);
+   
+   ImageView imgPriceIt = new ImageView(ctx);
+   //imgPriceIt.setGravity(Gravity.CENTER);
+   imgPriceIt.setImageResource(R.drawable.ic_price_it);
+   imgPriceIt.setLayoutParams(textWidgetParams);
+
+
+   /*TextView tvState = new TextView(ctx);
    tvState.setText("Price it Now!");
    tvState.setTextColor(hexStringToColor("#8A8A8A"));
    tvState.setTypeface(null, Typeface.BOLD);
-   tvState.setLayoutParams(textWidgetParams);
-   footerLayout.addView(tvState);
+   tvState.setLayoutParams(textWidgetParams);*/
+   
+   footerLayout.addView(imgPriceIt);
 
    footerLayout.setOnClickListener(new View.OnClickListener() {
      @Override
