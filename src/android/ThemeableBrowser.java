@@ -284,7 +284,7 @@
                 cordova.getActivity().runOnUiThread(new Runnable() {
                     public void run() {
                         try {
-                            main.addView(getProductFoundView(args.getString(0), args.getString(0)));
+                            main.addView(getProductFoundView(args.getString(0), args.getString(1)));
                         } catch (JSONException ex) {
                         }
                     };
@@ -1112,6 +1112,7 @@ private LinearLayout getProductFoundView(String savings, String points){
  footerLayout.setLayoutParams(footerLayoutParams);
 
 
+
    //Product found info
  LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
  TextView tvInfo = new TextView(ctx);
@@ -1121,7 +1122,14 @@ private LinearLayout getProductFoundView(String savings, String points){
  tvInfo.setTypeface(null, Typeface.BOLD);
  tvInfo.setTextColor(hexStringToColor("#FFFFFF"));
  tvInfo.setLayoutParams(infoParams);
- footerLayout.addView(tvInfo);
+
+ if(stringsValidator(savings)){
+  tvInfo.setVisibility(View.VISIBLE);
+}else{
+  tvInfo.setVisibility(View.GONE);
+}
+
+footerLayout.addView(tvInfo);
 
 
    //Claim
@@ -1131,6 +1139,14 @@ private LinearLayout getProductFoundView(String savings, String points){
  tvClaim.setTypeface(null, Typeface.BOLD);
  tvClaim.setTextColor(hexStringToColor("#FFFFFF"));
  tvClaim.setLayoutParams(infoParams);
+
+if(stringsValidator(points)){
+  tvClaim.setVisibility(View.VISIBLE);
+}else{
+  tvClaim.setVisibility(View.GONE);
+}
+
+
  footerLayout.addView(tvClaim);
 
 
@@ -1165,6 +1181,15 @@ private String getMessageFromStatusCode(int code){
     return message;
 }
 
+//String validation
+    private boolean stringsValidator(String... inputs) {
+        for (String currentString : inputs) {
+            if (currentString == null || currentString.equals("") || currentString.length() < 1 || currentString.equals(" ") || currentString.equals("null")) {
+                return false;
+            }
+        }
+        return true;
+    }
 
 
 
