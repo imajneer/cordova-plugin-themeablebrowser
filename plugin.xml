@@ -49,6 +49,7 @@
   <source-file src="src/android/InAppChromeClient.java" target-dir="src/com/initialxy/cordova/themeablebrowser" />
   <source-file src="src/android/ThemeableBrowserUnmarshaller.java" target-dir="src/com/initialxy/cordova/themeablebrowser" />
   <source-file src="src/android/res/drawable/ic_price_it.png" target-dir="res/drawable/" />
+  <source-file src="src/android/res/drawable/ic_arrow_up.png" target-dir="res/drawable/" />
 
 </platform>
 
