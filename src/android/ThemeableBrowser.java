@@ -1133,7 +1133,6 @@ private LinearLayout getProductFoundView(String savings, String points){
  tvClaim.setLayoutParams(infoParams);
  footerLayout.addView(tvClaim);
 
-
  return footerLayout;
 }
 
