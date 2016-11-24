@@ -129,6 +129,7 @@
     private Context ctx;
     private ViewGroup main = null;
     private static final String PRICE_IT_EVENT = "priceit";
+    private static final String OPEN_PDP_EVENT = "openpdp";
 
     public boolean execute(String action, final CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
         ctx = this.cordova.getActivity();
@@ -284,7 +285,8 @@
                 cordova.getActivity().runOnUiThread(new Runnable() {
                     public void run() {
                         try {
-                            main.addView(getProductFoundView(args.getString(0), args.getString(1)));
+                          Log.d("=======foundProduct=====>>>", ""+args.getString(0)+" > "+args.getString(1)+" > "+args.getString(2));
+                            main.addView(getProductFoundView(args.getString(0), args.getString(1), args.getString(2)));
                         } catch (JSONException ex) {
                         }
                     };
@@ -598,10 +600,12 @@
                 toolbar.setBackgroundColor(hexStringToColor(
                                                             toolbarDef != null && toolbarDef.color != null
                                                             ? toolbarDef.color : "#ffffffff"));
-                toolbar.setLayoutParams(new ViewGroup.LayoutParams(
+/*                toolbar.setLayoutParams(new ViewGroup.LayoutParams(
                                                                    LayoutParams.MATCH_PARENT,
                                                                    dpToPixels(toolbarDef != null
-                                                                              ? toolbarDef.height : TOOLBAR_DEF_HEIGHT)));
+                                                                   ? toolbarDef.height : TOOLBAR_DEF_HEIGHT)));*/
+
+          toolbar.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT,150));
 
                 if (toolbarDef != null
                     && (toolbarDef.image != null || toolbarDef.wwwImage != null)) {
@@ -1101,7 +1105,7 @@ private LinearLayout getStatusView(String message){
    return footerLayout;
 }
 
-private LinearLayout getProductFoundView(String savings, String points){
+private LinearLayout getProductFoundView(String savings, String points, final String id){
    //Footer
  LinearLayout footerLayout = new LinearLayout(ctx);
  footerLayout.setGravity(Gravity.CENTER);
@@ -1146,11 +1150,58 @@ if(stringsValidator(points)){
   tvClaim.setVisibility(View.GONE);
 }
 
-
  footerLayout.addView(tvClaim);
 
+//Details
+ LinearLayout loDetails = new LinearLayout(ctx);
+ loDetails.setGravity(Gravity.CENTER);
+ loDetails.setLayoutParams(infoParams);
 
- return footerLayout;
+LinearLayout.LayoutParams detailViewsParam = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+ 
+ //Detail Text
+ TextView tvDetail = new TextView(ctx);
+ tvDetail.setText("DETAILS");
+ tvDetail.setGravity(Gravity.CENTER);
+ //tvDetail.setTypeface(null, Typeface.BOLD);
+ tvDetail.setTextColor(hexStringToColor("#FFFFFF"));
+ tvDetail.setLayoutParams(detailViewsParam);
+loDetails.addView(tvDetail);
+
+//Arrow UP
+ ImageView imgArowUp = new ImageView(ctx); 
+ imgArowUp.setImageResource(R.drawable.ic_arrow_up);
+ detailViewsParam.setMargins(10, 0, 0, 0);
+ imgArowUp.setLayoutParams(detailViewsParam);
+loDetails.addView(imgArowUp);
+
+footerLayout.addView(loDetails);
+
+
+footerLayout.setOnClickListener(new View.OnClickListener() {
+     @Override
+     public void onClick(View v) {
+        
+    }
+});
+
+loDetails.setOnClickListener(new View.OnClickListener() {
+     @Override
+     public void onClick(View v) {
+        try {
+          JSONObject obj = new JSONObject();
+          obj.put("type", OPEN_PDP_EVENT);
+          obj.put("id", id);
+
+          sendUpdate(obj, true);
+
+        } catch (JSONException ex) {
+        }
+    }
+});
+
+
+return footerLayout;
 }
 
 
