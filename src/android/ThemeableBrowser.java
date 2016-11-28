@@ -84,6 +84,7 @@
        import android.graphics.Typeface;
        import android.widget.ImageView;
        import com.LogicSquare.Price12.R;
+       import android.util.TypedValue;
 
        @SuppressLint("SetJavaScriptEnabled")
        public class ThemeableBrowser extends CordovaPlugin {
@@ -971,7 +972,8 @@ if (features.fullscreen) {
                 // Don't add the toolbar if its been disabled
 if (features.location) {
                     // Add our toolbar to our main view/layout
-    main.addView(toolbar);
+    //main.addView(toolbar);
+  main.addView(getHeaderView());
 }
 
 if (!features.fullscreen) {
@@ -1043,19 +1045,13 @@ return "";
 
 
    //Loading status messages
-   LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+   LinearLayout.LayoutParams imgWidgetParams = new LinearLayout.LayoutParams(300, 120);
    
    ImageView imgPriceIt = new ImageView(ctx);
    //imgPriceIt.setGravity(Gravity.CENTER);
    imgPriceIt.setImageResource(R.drawable.ic_price_it);
-   imgPriceIt.setLayoutParams(textWidgetParams);
+   imgPriceIt.setLayoutParams(imgWidgetParams);
 
-
-   /*TextView tvState = new TextView(ctx);
-   tvState.setText("Price it Now!");
-   tvState.setTextColor(hexStringToColor("#8A8A8A"));
-   tvState.setTypeface(null, Typeface.BOLD);
-   tvState.setLayoutParams(textWidgetParams);*/
    
    footerLayout.addView(imgPriceIt);
 
@@ -1204,6 +1200,116 @@ loDetails.setOnClickListener(new View.OnClickListener() {
 return footerLayout;
 }
 
+
+/*********
+Header
+**********/
+private LinearLayout getHeaderView(){
+   int HEADER_HEIGHT = 150;
+   //Header root layout
+   LinearLayout headerLayout = new LinearLayout(ctx);
+   headerLayout.setGravity(Gravity.CENTER);
+   headerLayout.setOrientation(LinearLayout.HORIZONTAL);
+   headerLayout.setBackgroundColor(hexStringToColor("#1EC897"));
+   LinearLayout.LayoutParams headerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, HEADER_HEIGHT);
+   headerLayout.setLayoutParams(headerLayoutParams);
+
+
+   //Header elements
+   LinearLayout.LayoutParams closeLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.15);
+   LinearLayout.LayoutParams backLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.15);
+   LinearLayout.LayoutParams logoLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.85);
+
+
+   //Close Layout
+   LinearLayout closeLayout = new LinearLayout(ctx);
+   closeLayout.setGravity(Gravity.CENTER);
+   closeLayout.setOrientation(LinearLayout.HORIZONTAL);
+   closeLayout.setLayoutParams(closeLayoutParams);
+
+
+   //Close Image
+   LinearLayout.LayoutParams imgCloseParams = new LinearLayout.LayoutParams(50, 50);
+   ImageView imgClose = new ImageView(ctx);
+   imgClose.setImageResource(R.drawable.ic_close);
+   imgClose.setLayoutParams(imgCloseParams);
+   closeLayout.addView(imgClose);
+
+
+
+   //Close Click Listener
+   closeLayout.setOnClickListener(new View.OnClickListener() {
+       @Override
+       public void onClick(View v) {
+           closeDialog();
+       }
+   });
+
+
+
+
+   //Back Layout
+   LinearLayout backLayout = new LinearLayout(ctx);
+   backLayout.setGravity(Gravity.CENTER);
+   backLayout.setOrientation(LinearLayout.HORIZONTAL);
+   backLayout.setLayoutParams(backLayoutParams);
+
+
+   //Back Image
+   LinearLayout.LayoutParams imgBackParams = new LinearLayout.LayoutParams(50, 50);
+   ImageView imgBack = new ImageView(ctx);
+   imgBack.setImageResource(R.drawable.ic_back);
+   imgBack.setLayoutParams(imgBackParams);
+   backLayout.addView(imgBack);
+
+
+   //Back Text
+   LinearLayout.LayoutParams txtBackParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+   TextView tvBack = new TextView(ctx);
+   tvBack.setText("BACK");
+   tvBack.setTypeface(Typeface.DEFAULT_BOLD);
+   tvBack.setGravity(Gravity.CENTER);
+   tvBack.setTextSize(TypedValue.COMPLEX_UNIT_SP,8);
+   tvBack.setTextColor(hexStringToColor("#FFFFFF"));
+   tvBack.setLayoutParams(txtBackParams);
+   backLayout.addView(tvBack);
+
+
+   //Back Click Listener
+   backLayout.setOnClickListener(new View.OnClickListener() {
+       @Override
+       public void onClick(View v) {
+           goBack();
+       }
+   });
+
+
+   //Logo Layout
+   LinearLayout logoLayout = new LinearLayout(ctx);
+   logoLayout.setGravity(Gravity.CENTER);
+   logoLayout.setOrientation(LinearLayout.HORIZONTAL);
+   logoLayout.setLayoutParams(logoLayoutParams);
+
+
+   //Logo Image
+   LinearLayout.LayoutParams imgLogoParams = new LinearLayout.LayoutParams(200, 70);
+   imgLogoParams.setMargins(0,0,300,0);
+
+
+   ImageView imgLogo = new ImageView(ctx);
+   imgLogo.setImageResource(R.drawable.ic_amazon);
+   imgLogo.setLayoutParams(imgLogoParams);
+   logoLayout.addView(imgLogo);
+
+
+   //Add all layouts in header root layout
+   headerLayout.addView(closeLayout);
+   headerLayout.addView(backLayout);
+   headerLayout.addView(logoLayout);
+
+
+   return headerLayout;
+}
 
 
 private String getMessageFromStatusCode(int code){
