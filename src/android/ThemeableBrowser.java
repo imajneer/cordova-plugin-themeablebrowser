@@ -86,6 +86,15 @@
        import com.LogicSquare.Price12.R;
        import android.util.TypedValue;
 
+       //ImageLoader
+       import com.nostra13.universalimageloader.cache.memory.impl.WeakMemoryCache;
+       import com.nostra13.universalimageloader.core.DisplayImageOptions;
+       import com.nostra13.universalimageloader.core.ImageLoader;
+       import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
+       import com.nostra13.universalimageloader.core.assist.ImageScaleType;
+       import com.nostra13.universalimageloader.core.display.FadeInBitmapDisplayer;
+
+
        @SuppressLint("SetJavaScriptEnabled")
        public class ThemeableBrowser extends CordovaPlugin {
 
@@ -131,25 +140,32 @@
     private ViewGroup main = null;
     private static final String PRICE_IT_EVENT = "priceit";
     private static final String OPEN_PDP_EVENT = "openpdp";
+    private com.nostra13.universalimageloader.core.ImageLoader imageLoader;
+    private DisplayImageOptions imageLoadingOptions;
+    private String storeLogo = null;
 
     public boolean execute(String action, final CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
-        ctx = this.cordova.getActivity();
-        if (action.equals("open")) {
-            this.callbackContext = callbackContext;
-            final String url = args.getString(0);
-            String t = args.optString(1);
-            if (t == null || t.equals("") || t.equals(NULL)) {
-                t = SELF;
-            }
-            final String target = t;
-            final Options features = parseFeature(args.optString(2));
+      ctx = this.cordova.getActivity();
+      initLoaderLibrary();
+      initLoader();
 
-            this.cordova.getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    String result = "";
+      if (action.equals("open")) {
+        this.callbackContext = callbackContext;
+        final String url = args.getString(0);
+        String t = args.optString(1);
+        if (t == null || t.equals("") || t.equals(NULL)) {
+          t = SELF;
+        }
+        final String target = t;
+        final Options features = parseFeature(args.optString(2));
+        storeLogo = features.logoUrl;
+
+        this.cordova.getActivity().runOnUiThread(new Runnable() {
+          @Override
+          public void run() {
+            String result = "";
                     // SELF
-                    if (SELF.equals(target)) {
+            if (SELF.equals(target)) {
                         /* This code exists for compatibility between 3.x and 4.x versions of Cordova.
                          * Previously the Config class had a static method, isUrlWhitelisted(). That
                          * responsibility has been moved to the plugins, with an aggregating method in
@@ -157,148 +173,148 @@
                          */
                         Boolean shouldAllowNavigation = null;
                         if (url.startsWith("javascript:")) {
-                            shouldAllowNavigation = true;
+                          shouldAllowNavigation = true;
                         }
                         if (shouldAllowNavigation == null) {
-                            shouldAllowNavigation = new Whitelist().isUrlWhiteListed(url);
+                          shouldAllowNavigation = new Whitelist().isUrlWhiteListed(url);
                         }
                         if (shouldAllowNavigation == null) {
-                            try {
-                                Method gpm = webView.getClass().getMethod("getPluginManager");
-                                PluginManager pm = (PluginManager)gpm.invoke(webView);
-                                Method san = pm.getClass().getMethod("shouldAllowNavigation", String.class);
-                                shouldAllowNavigation = (Boolean)san.invoke(pm, url);
-                            } catch (NoSuchMethodException e) {
-                            } catch (IllegalAccessException e) {
-                            } catch (InvocationTargetException e) {
-                            }
+                          try {
+                            Method gpm = webView.getClass().getMethod("getPluginManager");
+                            PluginManager pm = (PluginManager)gpm.invoke(webView);
+                            Method san = pm.getClass().getMethod("shouldAllowNavigation", String.class);
+                            shouldAllowNavigation = (Boolean)san.invoke(pm, url);
+                          } catch (NoSuchMethodException e) {
+                          } catch (IllegalAccessException e) {
+                          } catch (InvocationTargetException e) {
+                          }
                         }
                         // load in webview
                         if (Boolean.TRUE.equals(shouldAllowNavigation)) {
-                            webView.loadUrl(url);
+                          webView.loadUrl(url);
                         }
                         //Load the dialer
                         else if (url.startsWith(WebView.SCHEME_TEL))
                         {
-                            try {
-                                Intent intent = new Intent(Intent.ACTION_DIAL);
-                                intent.setData(Uri.parse(url));
-                                cordova.getActivity().startActivity(intent);
-                            } catch (android.content.ActivityNotFoundException e) {
-                                emitError(ERR_CRITICAL,
-                                          String.format("Error dialing %s: %s", url, e.toString()));
-                            }
+                          try {
+                            Intent intent = new Intent(Intent.ACTION_DIAL);
+                            intent.setData(Uri.parse(url));
+                            cordova.getActivity().startActivity(intent);
+                          } catch (android.content.ActivityNotFoundException e) {
+                            emitError(ERR_CRITICAL,
+                                      String.format("Error dialing %s: %s", url, e.toString()));
+                          }
                         }
                         // load in ThemeableBrowser
                         else {
-                            result = showWebPage(url, features);
+                          result = showWebPage(url, features);
                         }
-                    }
+                      }
                     // SYSTEM
-                    else if (SYSTEM.equals(target)) {
+                      else if (SYSTEM.equals(target)) {
                         result = openExternal(url);
-                    }
+                      }
                     // BLANK - or anything else
-                    else {
+                      else {
                         result = showWebPage(url, features);
-                    }
+                      }
 
-                    PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
-                    pluginResult.setKeepCallback(true);
-                    callbackContext.sendPluginResult(pluginResult);
-                }
-            });
-        }
-        else if (action.equals("close")) {
-            closeDialog();
-        }
-        else if (action.equals("injectScriptCode")) {
-            String jsWrapper = null;
-            if (args.getBoolean(1)) {
-                jsWrapper = String.format("prompt(JSON.stringify([eval(%%s)]), 'gap-iab://%s')", callbackContext.getCallbackId());
-            }
-            injectDeferredObject(args.getString(0), jsWrapper);
-        }
-        else if (action.equals("injectScriptFile")) {
-            String jsWrapper;
-            if (args.getBoolean(1)) {
-                jsWrapper = String.format("(function(d) { var c = d.createElement('script'); c.src = %%s; c.onload = function() { prompt('', 'gap-iab://%s'); }; d.body.appendChild(c); })(document)", callbackContext.getCallbackId());
-            } else {
-                jsWrapper = "(function(d) { var c = d.createElement('script'); c.src = %s; d.body.appendChild(c); })(document)";
-            }
-            injectDeferredObject(args.getString(0), jsWrapper);
-        }
-        else if (action.equals("injectStyleCode")) {
-            String jsWrapper;
-            if (args.getBoolean(1)) {
-                jsWrapper = String.format("(function(d) { var c = d.createElement('style'); c.innerHTML = %%s; d.body.appendChild(c); prompt('', 'gap-iab://%s');})(document)", callbackContext.getCallbackId());
-            } else {
-                jsWrapper = "(function(d) { var c = d.createElement('style'); c.innerHTML = %s; d.body.appendChild(c); })(document)";
-            }
-            injectDeferredObject(args.getString(0), jsWrapper);
-        }
-        else if (action.equals("injectStyleFile")) {
-            String jsWrapper;
-            if (args.getBoolean(1)) {
-                jsWrapper = String.format("(function(d) { var c = d.createElement('link'); c.rel='stylesheet'; c.type='text/css'; c.href = %%s; d.head.appendChild(c); prompt('', 'gap-iab://%s');})(document)", callbackContext.getCallbackId());
-            } else {
-                jsWrapper = "(function(d) { var c = d.createElement('link'); c.rel='stylesheet'; c.type='text/css'; c.href = %s; d.head.appendChild(c); })(document)";
-            }
-            injectDeferredObject(args.getString(0), jsWrapper);
-        }
-        else if (action.equals("show")) {
-            this.cordova.getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    dialog.show();
-                }
-            });
-            PluginResult pluginResult = new PluginResult(PluginResult.Status.OK);
-            pluginResult.setKeepCallback(true);
-            this.callbackContext.sendPluginResult(pluginResult);
-        }
-        else if (action.equals("reload")) {
-            if (inAppWebView != null) {
-                this.cordova.getActivity().runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        inAppWebView.reload();
+                      PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
+                      pluginResult.setKeepCallback(true);
+                      callbackContext.sendPluginResult(pluginResult);
                     }
-                });
+                  });
+      }
+      else if (action.equals("close")) {
+        closeDialog();
+      }
+      else if (action.equals("injectScriptCode")) {
+        String jsWrapper = null;
+        if (args.getBoolean(1)) {
+          jsWrapper = String.format("prompt(JSON.stringify([eval(%%s)]), 'gap-iab://%s')", callbackContext.getCallbackId());
+        }
+        injectDeferredObject(args.getString(0), jsWrapper);
+      }
+      else if (action.equals("injectScriptFile")) {
+        String jsWrapper;
+        if (args.getBoolean(1)) {
+          jsWrapper = String.format("(function(d) { var c = d.createElement('script'); c.src = %%s; c.onload = function() { prompt('', 'gap-iab://%s'); }; d.body.appendChild(c); })(document)", callbackContext.getCallbackId());
+        } else {
+          jsWrapper = "(function(d) { var c = d.createElement('script'); c.src = %s; d.body.appendChild(c); })(document)";
+        }
+        injectDeferredObject(args.getString(0), jsWrapper);
+      }
+      else if (action.equals("injectStyleCode")) {
+        String jsWrapper;
+        if (args.getBoolean(1)) {
+          jsWrapper = String.format("(function(d) { var c = d.createElement('style'); c.innerHTML = %%s; d.body.appendChild(c); prompt('', 'gap-iab://%s');})(document)", callbackContext.getCallbackId());
+        } else {
+          jsWrapper = "(function(d) { var c = d.createElement('style'); c.innerHTML = %s; d.body.appendChild(c); })(document)";
+        }
+        injectDeferredObject(args.getString(0), jsWrapper);
+      }
+      else if (action.equals("injectStyleFile")) {
+        String jsWrapper;
+        if (args.getBoolean(1)) {
+          jsWrapper = String.format("(function(d) { var c = d.createElement('link'); c.rel='stylesheet'; c.type='text/css'; c.href = %%s; d.head.appendChild(c); prompt('', 'gap-iab://%s');})(document)", callbackContext.getCallbackId());
+        } else {
+          jsWrapper = "(function(d) { var c = d.createElement('link'); c.rel='stylesheet'; c.type='text/css'; c.href = %s; d.head.appendChild(c); })(document)";
+        }
+        injectDeferredObject(args.getString(0), jsWrapper);
+      }
+      else if (action.equals("show")) {
+        this.cordova.getActivity().runOnUiThread(new Runnable() {
+          @Override
+          public void run() {
+            dialog.show();
+          }
+        });
+        PluginResult pluginResult = new PluginResult(PluginResult.Status.OK);
+        pluginResult.setKeepCallback(true);
+        this.callbackContext.sendPluginResult(pluginResult);
+      }
+      else if (action.equals("reload")) {
+        if (inAppWebView != null) {
+          this.cordova.getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+              inAppWebView.reload();
             }
-        } 
-        else if(action.equals("gotStatusCode")){
-            
+          });
+        }
+      } 
+      else if(action.equals("gotStatusCode")){
+
             //Add Status Message view in footer area
-            if(main != null){
-                cordova.getActivity().runOnUiThread(new Runnable() {
-                    public void run() {
-                        try {
-                            main.addView(getStatusView(getMessageFromStatusCode(Integer.parseInt(args.getString(0)))));
-                        } catch (JSONException ex) {
-                        }
-                    };
-                });  
-            }
+        if(main != null){
+          cordova.getActivity().runOnUiThread(new Runnable() {
+            public void run() {
+              try {
+                main.addView(getStatusView(getMessageFromStatusCode(Integer.parseInt(args.getString(0)))));
+              } catch (JSONException ex) {
+              }
+            };
+          });  
         }
-        else if(action.equals("foundProduct")){
-            if(main != null){
-                cordova.getActivity().runOnUiThread(new Runnable() {
-                    public void run() {
-                        try {
-                          Log.d("=======foundProduct=====>>>", ""+args.getString(0)+" > "+args.getString(1)+" > "+args.getString(2));
-                            main.addView(getProductFoundView(args.getString(0), args.getString(1), args.getString(2)));
-                        } catch (JSONException ex) {
-                        }
-                    };
-                });  
-            }
+      }
+      else if(action.equals("foundProduct")){
+        if(main != null){
+          cordova.getActivity().runOnUiThread(new Runnable() {
+            public void run() {
+              try {
+                Log.d("=======foundProduct=====>>>", ""+args.getString(0)+" > "+args.getString(1)+" > "+args.getString(2));
+                main.addView(getProductFoundView(args.getString(0), args.getString(1), args.getString(2)));
+              } catch (JSONException ex) {
+              }
+            };
+          });  
+        }
 
-        }
-        else{
-            return false;
-        }
-        return true;
+      }
+      else{
+        return false;
+      }
+      return true;
     }
 
     /**
@@ -306,7 +322,7 @@
      */
     @Override
     public void onReset() {
-        closeDialog();
+      closeDialog();
     }
 
     /**
@@ -314,7 +330,7 @@
      * Stop listener.
      */
     public void onDestroy() {
-        closeDialog();
+      closeDialog();
     }
 
     /**
@@ -334,32 +350,32 @@
      *                    which should be executed directly.
      */
     private void injectDeferredObject(String source, String jsWrapper) {
-        String scriptToInject;
-        if (jsWrapper != null) {
-            org.json.JSONArray jsonEsc = new org.json.JSONArray();
-            jsonEsc.put(source);
-            String jsonRepr = jsonEsc.toString();
-            String jsonSourceString = jsonRepr.substring(1, jsonRepr.length()-1);
-            scriptToInject = String.format(jsWrapper, jsonSourceString);
-        } else {
-            scriptToInject = source;
-        }
-        final String finalScriptToInject = scriptToInject;
-        this.cordova.getActivity().runOnUiThread(new Runnable() {
-            @SuppressLint("NewApi")
-            @Override
-            public void run() {
-                if (inAppWebView != null) {
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+      String scriptToInject;
+      if (jsWrapper != null) {
+        org.json.JSONArray jsonEsc = new org.json.JSONArray();
+        jsonEsc.put(source);
+        String jsonRepr = jsonEsc.toString();
+        String jsonSourceString = jsonRepr.substring(1, jsonRepr.length()-1);
+        scriptToInject = String.format(jsWrapper, jsonSourceString);
+      } else {
+        scriptToInject = source;
+      }
+      final String finalScriptToInject = scriptToInject;
+      this.cordova.getActivity().runOnUiThread(new Runnable() {
+        @SuppressLint("NewApi")
+        @Override
+        public void run() {
+          if (inAppWebView != null) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
                         // This action will have the side-effect of blurring the currently focused
                         // element
-                        inAppWebView.loadUrl("javascript:" + finalScriptToInject);
-                    } else {
-                        inAppWebView.evaluateJavascript(finalScriptToInject, null);
-                    }
-                }
+              inAppWebView.loadUrl("javascript:" + finalScriptToInject);
+            } else {
+              inAppWebView.evaluateJavascript(finalScriptToInject, null);
             }
-        });
+          }
+        }
+      });
     }
 
     /**
@@ -369,29 +385,29 @@
      * @return
      */
     private Options parseFeature(String optString) {
-        Options result = null;
-        if (optString != null && !optString.isEmpty()) {
-            try {
-                result = ThemeableBrowserUnmarshaller.JSONToObj(
-                                                                optString, Options.class);
-            } catch (Exception e) {
-                emitError(ERR_CRITICAL,
-                          String.format("Invalid JSON @s", e.toString()));
-            }
-        } else {
-            emitWarning(WRN_UNDEFINED,
-                        "No config was given, defaults will be used, "
-                        + "which is quite boring.");
+      Options result = null;
+      if (optString != null && !optString.isEmpty()) {
+        try {
+          result = ThemeableBrowserUnmarshaller.JSONToObj(
+                                                          optString, Options.class);
+        } catch (Exception e) {
+          emitError(ERR_CRITICAL,
+                    String.format("Invalid JSON @s", e.toString()));
         }
+      } else {
+        emitWarning(WRN_UNDEFINED,
+                    "No config was given, defaults will be used, "
+                    + "which is quite boring.");
+      }
 
-        if (result == null) {
-            result = new Options();
-        }
+      if (result == null) {
+        result = new Options();
+      }
 
         // Always show location, this property is overwritten.
-        result.location = true;
+      result.location = true;
 
-        return result;
+      return result;
     }
 
     /**
@@ -401,124 +417,124 @@
      * @return
      */
     public String openExternal(String url) {
-        try {
-            Intent intent = null;
-            intent = new Intent(Intent.ACTION_VIEW);
+      try {
+        Intent intent = null;
+        intent = new Intent(Intent.ACTION_VIEW);
             // Omitting the MIME type for file: URLs causes "No Activity found to handle Intent".
             // Adding the MIME type to http: URLs causes them to not be handled by the downloader.
-            Uri uri = Uri.parse(url);
-            if ("file".equals(uri.getScheme())) {
-                intent.setDataAndType(uri, webView.getResourceApi().getMimeType(uri));
-            } else {
-                intent.setData(uri);
-            }
-            intent.putExtra(Browser.EXTRA_APPLICATION_ID, cordova.getActivity().getPackageName());
-            this.cordova.getActivity().startActivity(intent);
-            return "";
-        } catch (android.content.ActivityNotFoundException e) {
-            Log.d(LOG_TAG, "ThemeableBrowser: Error loading url "+url+":"+ e.toString());
-            return e.toString();
+        Uri uri = Uri.parse(url);
+        if ("file".equals(uri.getScheme())) {
+          intent.setDataAndType(uri, webView.getResourceApi().getMimeType(uri));
+        } else {
+          intent.setData(uri);
         }
+        intent.putExtra(Browser.EXTRA_APPLICATION_ID, cordova.getActivity().getPackageName());
+        this.cordova.getActivity().startActivity(intent);
+        return "";
+      } catch (android.content.ActivityNotFoundException e) {
+        Log.d(LOG_TAG, "ThemeableBrowser: Error loading url "+url+":"+ e.toString());
+        return e.toString();
+      }
     }
 
     /**
      * Closes the dialog
      */
     public void closeDialog() {
-        this.cordova.getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
+      this.cordova.getActivity().runOnUiThread(new Runnable() {
+        @Override
+        public void run() {
                 // The JS protects against multiple calls, so this should happen only when
                 // closeDialog() is called by other native code.
-                if (inAppWebView == null) {
-                    emitWarning(WRN_UNEXPECTED, "Close called but already closed.");
-                    return;
-                }
+          if (inAppWebView == null) {
+            emitWarning(WRN_UNEXPECTED, "Close called but already closed.");
+            return;
+          }
 
-                inAppWebView.setWebViewClient(new WebViewClient() {
+          inAppWebView.setWebViewClient(new WebViewClient() {
                     // NB: wait for about:blank before dismissing
-                    public void onPageFinished(WebView view, String url) {
-                        if (dialog != null) {
-                            dialog.dismiss();
-                        }
+            public void onPageFinished(WebView view, String url) {
+              if (dialog != null) {
+                dialog.dismiss();
+              }
 
                         // Clean up.
-                        dialog = null;
-                        inAppWebView = null;
-                        edittext = null;
-                        callbackContext = null;
-                    }
-                });
+              dialog = null;
+              inAppWebView = null;
+              edittext = null;
+              callbackContext = null;
+            }
+          });
 
                 // NB: From SDK 19: "If you call methods on WebView from any
                 // thread other than your app's UI thread, it can cause
                 // unexpected results."
                 // http://developer.android.com/guide/webapps/migrating.html#Threads
-                inAppWebView.loadUrl("about:blank");
+          inAppWebView.loadUrl("about:blank");
 
-                try {
-                    JSONObject obj = new JSONObject();
-                    obj.put("type", EXIT_EVENT);
-                    sendUpdate(obj, false);
-                } catch (JSONException ex) {
-                }
-            }
-        });
+          try {
+            JSONObject obj = new JSONObject();
+            obj.put("type", EXIT_EVENT);
+            sendUpdate(obj, false);
+          } catch (JSONException ex) {
+          }
+        }
+      });
     }
 
     private void emitButtonEvent(Event event, String url) {
-        emitButtonEvent(event, url, null);
+      emitButtonEvent(event, url, null);
     }
 
     private void emitButtonEvent(Event event, String url, Integer index) {
-        if (event != null && event.event != null) {
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("type", event.event);
-                obj.put("url", url);
-                if (index != null) {
-                    obj.put("index", index.intValue());
-                }
-                sendUpdate(obj, true);
-            } catch (JSONException e) {
+      if (event != null && event.event != null) {
+        try {
+          JSONObject obj = new JSONObject();
+          obj.put("type", event.event);
+          obj.put("url", url);
+          if (index != null) {
+            obj.put("index", index.intValue());
+          }
+          sendUpdate(obj, true);
+        } catch (JSONException e) {
                 // Ignore, should never happen.
-            }
-        } else {
-            emitWarning(WRN_UNDEFINED,
-                        "Button clicked, but event property undefined. "
-                        + "No event will be raised.");
         }
+      } else {
+        emitWarning(WRN_UNDEFINED,
+                    "Button clicked, but event property undefined. "
+                    + "No event will be raised.");
+      }
     }
 
     private void emitError(String code, String message) {
-        emitLog(EVT_ERR, code, message);
+      emitLog(EVT_ERR, code, message);
     }
 
     private void emitWarning(String code, String message) {
-        emitLog(EVT_WRN, code, message);
+      emitLog(EVT_WRN, code, message);
     }
 
     private void emitLog(String type, String code, String message) {
-        if (type != null) {
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("type", type);
-                obj.put("code", code);
-                obj.put("message", message);
-                sendUpdate(obj, true);
-            } catch (JSONException e) {
+      if (type != null) {
+        try {
+          JSONObject obj = new JSONObject();
+          obj.put("type", type);
+          obj.put("code", code);
+          obj.put("message", message);
+          sendUpdate(obj, true);
+        } catch (JSONException e) {
                 // Ignore, should never happen.
-            }
         }
+      }
     }
 
     /**
      * Checks to see if it is possible to go back one page in history, then does so.
      */
     public void goBack() {
-        if (this.inAppWebView != null && this.inAppWebView.canGoBack()) {
-            this.inAppWebView.goBack();
-        }
+      if (this.inAppWebView != null && this.inAppWebView.canGoBack()) {
+        this.inAppWebView.goBack();
+      }
     }
 
     /**
@@ -526,16 +542,16 @@
      * @return boolean
      */
     public boolean canGoBack() {
-        return this.inAppWebView != null && this.inAppWebView.canGoBack();
+      return this.inAppWebView != null && this.inAppWebView.canGoBack();
     }
 
     /**
      * Checks to see if it is possible to go forward one page in history, then does so.
      */
     private void goForward() {
-        if (this.inAppWebView != null && this.inAppWebView.canGoForward()) {
-            this.inAppWebView.goForward();
-        }
+      if (this.inAppWebView != null && this.inAppWebView.canGoForward()) {
+        this.inAppWebView.goForward();
+      }
     }
 
     /**
@@ -544,19 +560,19 @@
      * @param url to load
      */
     private void navigate(String url) {
-        InputMethodManager imm = (InputMethodManager)this.cordova.getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(edittext.getWindowToken(), 0);
+      InputMethodManager imm = (InputMethodManager)this.cordova.getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+      imm.hideSoftInputFromWindow(edittext.getWindowToken(), 0);
 
-        if (!url.startsWith("http") && !url.startsWith("file:")) {
-            this.inAppWebView.loadUrl("http://" + url);
-        } else {
-            this.inAppWebView.loadUrl(url);
-        }
-        this.inAppWebView.requestFocus();
+      if (!url.startsWith("http") && !url.startsWith("file:")) {
+        this.inAppWebView.loadUrl("http://" + url);
+      } else {
+        this.inAppWebView.loadUrl(url);
+      }
+      this.inAppWebView.requestFocus();
     }
 
     private ThemeableBrowser getThemeableBrowser() {
-        return this;
+      return this;
     }
 
     /**
@@ -567,32 +583,32 @@
      * @return
      */
     public String showWebPage(final String url, final Options features) {
-        final CordovaWebView thatWebView = this.webView;
+      final CordovaWebView thatWebView = this.webView;
 
         // Create dialog in new thread
-        Runnable runnable = new Runnable() {
-            @SuppressLint("NewApi")
-            public void run() {
+      Runnable runnable = new Runnable() {
+        @SuppressLint("NewApi")
+        public void run() {
                 // Let's create the main dialog
-                dialog = new ThemeableBrowserDialog(cordova.getActivity(),
-                                                    android.R.style.Theme_Black_NoTitleBar,
-                                                    features.hardwareback);
-                if (!features.disableAnimation) {
-                    dialog.getWindow().getAttributes().windowAnimations
-                    = android.R.style.Animation_Dialog;
-                }
-                dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-                dialog.setCancelable(true);
-                dialog.setThemeableBrowser(getThemeableBrowser());
+          dialog = new ThemeableBrowserDialog(cordova.getActivity(),
+                                              android.R.style.Theme_Black_NoTitleBar,
+                                              features.hardwareback);
+          if (!features.disableAnimation) {
+            dialog.getWindow().getAttributes().windowAnimations
+            = android.R.style.Animation_Dialog;
+          }
+          dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+          dialog.setCancelable(true);
+          dialog.setThemeableBrowser(getThemeableBrowser());
 
                 /*// Main container layout
                 ViewGroup main = null;*/
 
                 if (features.fullscreen) {
-                    main = new FrameLayout(cordova.getActivity());
+                  main = new FrameLayout(cordova.getActivity());
                 } else {
-                    main = new LinearLayout(cordova.getActivity());
-                    ((LinearLayout) main).setOrientation(LinearLayout.VERTICAL);
+                  main = new LinearLayout(cordova.getActivity());
+                  ((LinearLayout) main).setOrientation(LinearLayout.VERTICAL);
                 }
 
                 // Toolbar layout
@@ -606,59 +622,59 @@
                                                                    dpToPixels(toolbarDef != null
                                                                    ? toolbarDef.height : TOOLBAR_DEF_HEIGHT)));*/
 
-          toolbar.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT,150));
+                                                                   toolbar.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT,150));
 
-                if (toolbarDef != null
-                    && (toolbarDef.image != null || toolbarDef.wwwImage != null)) {
-                    try {
-                        Drawable background = getImage(toolbarDef.image
-                                                       , toolbarDef.wwwImage, toolbarDef.wwwImageDensity);
-                        setBackground(toolbar, background);
-                    } catch (Resources.NotFoundException e) {
-                        emitError(ERR_LOADFAIL,
-                                  String.format("Image for toolbar, %s, failed to load",
-                                                toolbarDef.image));
-                    } catch (IOException ioe) {
-                        emitError(ERR_LOADFAIL,
-                                  String.format("Image for toolbar, %s, failed to load",
-                                                toolbarDef.wwwImage));
-                    }
-                }
+                                                                   if (toolbarDef != null
+                                                                       && (toolbarDef.image != null || toolbarDef.wwwImage != null)) {
+                                                                    try {
+                                                                      Drawable background = getImage(toolbarDef.image
+                                                                                                     , toolbarDef.wwwImage, toolbarDef.wwwImageDensity);
+                                                                      setBackground(toolbar, background);
+                                                                    } catch (Resources.NotFoundException e) {
+                                                                      emitError(ERR_LOADFAIL,
+                                                                                String.format("Image for toolbar, %s, failed to load",
+                                                                                              toolbarDef.image));
+                                                                    } catch (IOException ioe) {
+                                                                      emitError(ERR_LOADFAIL,
+                                                                                String.format("Image for toolbar, %s, failed to load",
+                                                                                              toolbarDef.wwwImage));
+                                                                    }
+                                                                  }
 
                 // Left Button Container layout
-                LinearLayout leftButtonContainer = new LinearLayout(cordova.getActivity());
-                FrameLayout.LayoutParams leftButtonContainerParams = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-                leftButtonContainerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL;
-                leftButtonContainer.setLayoutParams(leftButtonContainerParams);
-                leftButtonContainer.setVerticalGravity(Gravity.CENTER_VERTICAL);
+                                                                  LinearLayout leftButtonContainer = new LinearLayout(cordova.getActivity());
+                                                                  FrameLayout.LayoutParams leftButtonContainerParams = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+                                                                  leftButtonContainerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL;
+                                                                  leftButtonContainer.setLayoutParams(leftButtonContainerParams);
+                                                                  leftButtonContainer.setVerticalGravity(Gravity.CENTER_VERTICAL);
 
                 // Right Button Container layout
-                LinearLayout rightButtonContainer = new LinearLayout(cordova.getActivity());
-                FrameLayout.LayoutParams rightButtonContainerParams = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-                rightButtonContainerParams.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
-                rightButtonContainer.setLayoutParams(rightButtonContainerParams);
-                rightButtonContainer.setVerticalGravity(Gravity.CENTER_VERTICAL);
+                                                                  LinearLayout rightButtonContainer = new LinearLayout(cordova.getActivity());
+                                                                  FrameLayout.LayoutParams rightButtonContainerParams = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+                                                                  rightButtonContainerParams.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+                                                                  rightButtonContainer.setLayoutParams(rightButtonContainerParams);
+                                                                  rightButtonContainer.setVerticalGravity(Gravity.CENTER_VERTICAL);
 
                 // Edit Text Box
-                edittext = new EditText(cordova.getActivity());
-                RelativeLayout.LayoutParams textLayoutParams = new RelativeLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-                textLayoutParams.addRule(RelativeLayout.RIGHT_OF, 1);
-                textLayoutParams.addRule(RelativeLayout.LEFT_OF, 5);
-                edittext.setLayoutParams(textLayoutParams);
-                edittext.setSingleLine(true);
-                edittext.setText(url);
-                edittext.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-                edittext.setImeOptions(EditorInfo.IME_ACTION_GO);
+                                                                  edittext = new EditText(cordova.getActivity());
+                                                                  RelativeLayout.LayoutParams textLayoutParams = new RelativeLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+                                                                  textLayoutParams.addRule(RelativeLayout.RIGHT_OF, 1);
+                                                                  textLayoutParams.addRule(RelativeLayout.LEFT_OF, 5);
+                                                                  edittext.setLayoutParams(textLayoutParams);
+                                                                  edittext.setSingleLine(true);
+                                                                  edittext.setText(url);
+                                                                  edittext.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+                                                                  edittext.setImeOptions(EditorInfo.IME_ACTION_GO);
                 edittext.setInputType(InputType.TYPE_NULL); // Will not except input... Makes the text NON-EDITABLE
                 edittext.setOnKeyListener(new View.OnKeyListener() {
-                    public boolean onKey(View v, int keyCode, KeyEvent event) {
+                  public boolean onKey(View v, int keyCode, KeyEvent event) {
                         // If the event is a key-down event on the "enter" button
-                        if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
-                            navigate(edittext.getText().toString());
-                            return true;
-                        }
-                        return false;
+                    if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
+                      navigate(edittext.getText().toString());
+                      return true;
                     }
+                    return false;
+                  }
                 });
 
                 // Back button
@@ -666,22 +682,22 @@
                                                  features.backButton,
                                                  "back button",
                                                  new View.OnClickListener() {
-                                                    public void onClick(View v) {
-                                                        emitButtonEvent(
-                                                                        features.backButton,
-                                                                        inAppWebView.getUrl());
+                                                  public void onClick(View v) {
+                                                    emitButtonEvent(
+                                                                    features.backButton,
+                                                                    inAppWebView.getUrl());
 
-                                                        if (features.backButtonCanClose && !canGoBack()) {
-                                                            closeDialog();
-                                                        } else {
-                                                            goBack();
-                                                        }
+                                                    if (features.backButtonCanClose && !canGoBack()) {
+                                                      closeDialog();
+                                                    } else {
+                                                      goBack();
                                                     }
+                                                  }
                                                 }
                                                 );
 
                 if (back != null) {
-                    back.setEnabled(features.backButtonCanClose);
+                  back.setEnabled(features.backButtonCanClose);
                 }
 
                 // Forward button
@@ -689,18 +705,18 @@
                                                     features.forwardButton,
                                                     "forward button",
                                                     new View.OnClickListener() {
-                                                        public void onClick(View v) {
-                                                            emitButtonEvent(
-                                                                            features.forwardButton,
-                                                                            inAppWebView.getUrl());
+                                                      public void onClick(View v) {
+                                                        emitButtonEvent(
+                                                                        features.forwardButton,
+                                                                        inAppWebView.getUrl());
 
-                                                            goForward();
-                                                        }
+                                                        goForward();
+                                                      }
                                                     }
                                                     );
 
                 if (back != null) {
-                    back.setEnabled(false);
+                  back.setEnabled(false);
                 }
 
 
@@ -709,12 +725,12 @@
                                             features.closeButton,
                                             "close button",
                                             new View.OnClickListener() {
-                                                public void onClick(View v) {
-                                                    emitButtonEvent(
-                                                                    features.closeButton,
-                                                                    inAppWebView.getUrl());
-                                                    closeDialog();
-                                                }
+                                              public void onClick(View v) {
+                                                emitButtonEvent(
+                                                                features.closeButton,
+                                                                inAppWebView.getUrl());
+                                                closeDialog();
+                                              }
                                             }
                                             );
 
@@ -722,75 +738,75 @@
                 Spinner menu = features.menu != null
                 ? new MenuSpinner(cordova.getActivity()) : null;
                 if (menu != null) {
-                    menu.setLayoutParams(new LinearLayout.LayoutParams(
-                                                                       LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-                    menu.setContentDescription("menu button");
-                    setButtonImages(menu, features.menu, DISABLED_ALPHA);
+                  menu.setLayoutParams(new LinearLayout.LayoutParams(
+                                                                     LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+                  menu.setContentDescription("menu button");
+                  setButtonImages(menu, features.menu, DISABLED_ALPHA);
 
                     // We are not allowed to use onClickListener for Spinner, so we will use
                     // onTouchListener as a fallback.
-                    menu.setOnTouchListener(new View.OnTouchListener() {
-                        @Override
-                        public boolean onTouch(View v, MotionEvent event) {
-                            if (event.getAction() == MotionEvent.ACTION_UP) {
-                                emitButtonEvent(
-                                                features.menu,
-                                                inAppWebView.getUrl());
-                            }
-                            return false;
-                        }
-                    });
+                  menu.setOnTouchListener(new View.OnTouchListener() {
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                      if (event.getAction() == MotionEvent.ACTION_UP) {
+                        emitButtonEvent(
+                                        features.menu,
+                                        inAppWebView.getUrl());
+                      }
+                      return false;
+                    }
+                  });
 
-                    if (features.menu.items != null) {
-                        HideSelectedAdapter<EventLabel> adapter
-                        = new HideSelectedAdapter<EventLabel>(
-                                                              cordova.getActivity(),
-                                                              android.R.layout.simple_spinner_item,
-                                                              features.menu.items);
-                        adapter.setDropDownViewResource(
-                                                        android.R.layout.simple_spinner_dropdown_item);
-                        menu.setAdapter(adapter);
-                        menu.setOnItemSelectedListener(
-                                                       new AdapterView.OnItemSelectedListener() {
-                                                        @Override
-                                                        public void onItemSelected(
-                                                                                   AdapterView<?> adapterView,
-                                                                                   View view, int i, long l) {
-                                                            if (inAppWebView != null
-                                                                && i < features.menu.items.length) {
-                                                                emitButtonEvent(
-                                                                                features.menu.items[i],
-                                                                                inAppWebView.getUrl(), i);
-                                                        }
-                                                    }
-
+                  if (features.menu.items != null) {
+                    HideSelectedAdapter<EventLabel> adapter
+                    = new HideSelectedAdapter<EventLabel>(
+                                                          cordova.getActivity(),
+                                                          android.R.layout.simple_spinner_item,
+                                                          features.menu.items);
+                    adapter.setDropDownViewResource(
+                                                    android.R.layout.simple_spinner_dropdown_item);
+                    menu.setAdapter(adapter);
+                    menu.setOnItemSelectedListener(
+                                                   new AdapterView.OnItemSelectedListener() {
                                                     @Override
-                                                    public void onNothingSelected(
-                                                                                  AdapterView<?> adapterView) {
+                                                    public void onItemSelected(
+                                                                               AdapterView<?> adapterView,
+                                                                               View view, int i, long l) {
+                                                      if (inAppWebView != null
+                                                          && i < features.menu.items.length) {
+                                                        emitButtonEvent(
+                                                                        features.menu.items[i],
+                                                                        inAppWebView.getUrl(), i);
                                                     }
+                                                  }
+
+                                                  @Override
+                                                  public void onNothingSelected(
+                                                                                AdapterView<?> adapterView) {
+                                                  }
                                                 }
                                                 );
-                    }
+                  }
                 }
 
                 // Title
                 final TextView title = features.title != null
                 ? new TextView(cordova.getActivity()) : null;
                 if (title != null) {
-                    FrameLayout.LayoutParams titleParams
-                    = new FrameLayout.LayoutParams(
-                                                   LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-                    titleParams.gravity = Gravity.CENTER;
-                    title.setLayoutParams(titleParams);
-                    title.setSingleLine();
-                    title.setEllipsize(TextUtils.TruncateAt.END);
-                    title.setGravity(Gravity.CENTER);
-                    title.setTextColor(hexStringToColor(
-                                                        features.title.color != null
-                                                        ? features.title.color : "#000000ff"));
-                    if (features.title.staticText != null) {
-                        title.setText(features.title.staticText);
-                    }
+                  FrameLayout.LayoutParams titleParams
+                  = new FrameLayout.LayoutParams(
+                                                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+                  titleParams.gravity = Gravity.CENTER;
+                  title.setLayoutParams(titleParams);
+                  title.setSingleLine();
+                  title.setEllipsize(TextUtils.TruncateAt.END);
+                  title.setGravity(Gravity.CENTER);
+                  title.setTextColor(hexStringToColor(
+                                                      features.title.color != null
+                                                      ? features.title.color : "#000000ff"));
+                  if (features.title.staticText != null) {
+                    title.setText(features.title.staticText);
+                  }
                 }
 
                 // WebView
@@ -799,7 +815,7 @@
                 ? new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
                 : new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0);
                 if (!features.fullscreen) {
-                    ((LinearLayout.LayoutParams) inAppWebViewParams).weight = 1;
+                  ((LinearLayout.LayoutParams) inAppWebViewParams).weight = 1;
                 }
 
                 //inAppWebViewParams.setMargins(0,0,0,150);
@@ -807,24 +823,24 @@
                 inAppWebView.setLayoutParams(inAppWebViewParams);
                 inAppWebView.setWebChromeClient(new InAppChromeClient(thatWebView));
                 WebViewClient client = new ThemeableBrowserClient(thatWebView, new PageLoadListener() {
-                    @Override
-                    public void onPageFinished(String url, boolean canGoBack, boolean canGoForward) {
-                        if (inAppWebView != null
-                            && title != null && features.title != null
-                            && features.title.staticText == null
-                            && features.title.showPageTitle) {
-                            title.setText(inAppWebView.getTitle());
-                    }
+                  @Override
+                  public void onPageFinished(String url, boolean canGoBack, boolean canGoForward) {
+                    if (inAppWebView != null
+                        && title != null && features.title != null
+                        && features.title.staticText == null
+                        && features.title.showPageTitle) {
+                      title.setText(inAppWebView.getTitle());
+                  }
 
-                    if (back != null) {
-                        back.setEnabled(canGoBack || features.backButtonCanClose);
-                    }
+                  if (back != null) {
+                    back.setEnabled(canGoBack || features.backButtonCanClose);
+                  }
 
-                    if (forward != null) {
-                        forward.setEnabled(canGoForward);
-                    }
+                  if (forward != null) {
+                    forward.setEnabled(canGoForward);
+                  }
                 }
-            });
+              });
                 inAppWebView.setWebViewClient(client);
                 WebSettings settings = inAppWebView.getSettings();
                 settings.setJavaScriptEnabled(true);
@@ -837,16 +853,16 @@
                 Bundle appSettings = cordova.getActivity().getIntent().getExtras();
                 boolean enableDatabase = appSettings == null || appSettings.getBoolean("ThemeableBrowserStorageEnabled", true);
                 if (enableDatabase) {
-                    String databasePath = cordova.getActivity().getApplicationContext().getDir("themeableBrowserDB", Context.MODE_PRIVATE).getPath();
-                    settings.setDatabasePath(databasePath);
-                    settings.setDatabaseEnabled(true);
+                  String databasePath = cordova.getActivity().getApplicationContext().getDir("themeableBrowserDB", Context.MODE_PRIVATE).getPath();
+                  settings.setDatabasePath(databasePath);
+                  settings.setDatabaseEnabled(true);
                 }
                 settings.setDomStorageEnabled(true);
 
                 if (features.clearcache) {
-                    CookieManager.getInstance().removeAllCookie();
+                  CookieManager.getInstance().removeAllCookie();
                 } else if (features.clearsessioncache) {
-                    CookieManager.getInstance().removeSessionCookie();
+                  CookieManager.getInstance().removeSessionCookie();
                 }
 
                 inAppWebView.loadUrl(url);
@@ -862,33 +878,33 @@
                 int rightContainerWidth = 0;
 
                 if (features.customButtons != null) {
-                    for (int i = 0; i < features.customButtons.length; i++) {
-                        final BrowserButton buttonProps = features.customButtons[i];
-                        final int index = i;
-                        Button button = createButton(
-                                                     buttonProps,
-                                                     String.format("custom button at %d", i),
-                                                     new View.OnClickListener() {
-                                                        @Override
-                                                        public void onClick(View view) {
-                                                            if (inAppWebView != null) {
-                                                                emitButtonEvent(buttonProps,
-                                                                                inAppWebView.getUrl(), index);
-                                                            }
-                                                        }
+                  for (int i = 0; i < features.customButtons.length; i++) {
+                    final BrowserButton buttonProps = features.customButtons[i];
+                    final int index = i;
+                    Button button = createButton(
+                                                 buttonProps,
+                                                 String.format("custom button at %d", i),
+                                                 new View.OnClickListener() {
+                                                  @Override
+                                                  public void onClick(View view) {
+                                                    if (inAppWebView != null) {
+                                                      emitButtonEvent(buttonProps,
+                                                                      inAppWebView.getUrl(), index);
                                                     }
-                                                    );
+                                                  }
+                                                }
+                                                );
 
-                        if (ALIGN_RIGHT.equals(buttonProps.align)) {
-                            rightButtonContainer.addView(button);
-                            rightContainerWidth
-                            += button.getLayoutParams().width;
-                        } else {
-                            leftButtonContainer.addView(button, 0);
-                            leftContainerWidth
-                            += button.getLayoutParams().width;
-                        }
+                    if (ALIGN_RIGHT.equals(buttonProps.align)) {
+                      rightButtonContainer.addView(button);
+                      rightContainerWidth
+                      += button.getLayoutParams().width;
+                    } else {
+                      leftButtonContainer.addView(button, 0);
+                      leftContainerWidth
+                      += button.getLayoutParams().width;
                     }
+                  }
                 }
 
                 // Back and forward buttons must be added with special ordering logic such
@@ -896,105 +912,105 @@
                 // are on the same side.
                 if (forward != null && features.forwardButton != null
                     && !ALIGN_RIGHT.equals(features.forwardButton.align)) {
-                    leftButtonContainer.addView(forward, 0);
+                  leftButtonContainer.addView(forward, 0);
                 leftContainerWidth
                 += forward.getLayoutParams().width;
+              }
+
+              if (back != null && features.backButton != null
+                  && ALIGN_RIGHT.equals(features.backButton.align)) {
+                rightButtonContainer.addView(back);
+              rightContainerWidth
+              += back.getLayoutParams().width;
             }
 
             if (back != null && features.backButton != null
-                && ALIGN_RIGHT.equals(features.backButton.align)) {
-                rightButtonContainer.addView(back);
-            rightContainerWidth
+                && !ALIGN_RIGHT.equals(features.backButton.align)) {
+              leftButtonContainer.addView(back, 0);
+            leftContainerWidth
             += back.getLayoutParams().width;
+          }
+
+          if (forward != null && features.forwardButton != null
+              && ALIGN_RIGHT.equals(features.forwardButton.align)) {
+            rightButtonContainer.addView(forward);
+          rightContainerWidth
+          += forward.getLayoutParams().width;
         }
 
-        if (back != null && features.backButton != null
-            && !ALIGN_RIGHT.equals(features.backButton.align)) {
-            leftButtonContainer.addView(back, 0);
+        if (menu != null) {
+          if (features.menu != null
+              && ALIGN_RIGHT.equals(features.menu.align)) {
+            rightButtonContainer.addView(menu);
+          rightContainerWidth
+          += menu.getLayoutParams().width;
+        } else {
+          leftButtonContainer.addView(menu, 0);
+          leftContainerWidth
+          += menu.getLayoutParams().width;
+        }
+      }
+
+      if (close != null) {
+        if (features.closeButton != null
+            && ALIGN_RIGHT.equals(features.closeButton.align)) {
+          rightButtonContainer.addView(close);
+        rightContainerWidth
+        += close.getLayoutParams().width;
+      } else {
+        leftButtonContainer.addView(close, 0);
         leftContainerWidth
-        += back.getLayoutParams().width;
+        += close.getLayoutParams().width;
+      }
     }
 
-    if (forward != null && features.forwardButton != null
-        && ALIGN_RIGHT.equals(features.forwardButton.align)) {
-        rightButtonContainer.addView(forward);
-    rightContainerWidth
-    += forward.getLayoutParams().width;
-}
-
-if (menu != null) {
-    if (features.menu != null
-        && ALIGN_RIGHT.equals(features.menu.align)) {
-        rightButtonContainer.addView(menu);
-    rightContainerWidth
-    += menu.getLayoutParams().width;
-} else {
-    leftButtonContainer.addView(menu, 0);
-    leftContainerWidth
-    += menu.getLayoutParams().width;
-}
-}
-
-if (close != null) {
-    if (features.closeButton != null
-        && ALIGN_RIGHT.equals(features.closeButton.align)) {
-        rightButtonContainer.addView(close);
-    rightContainerWidth
-    += close.getLayoutParams().width;
-} else {
-    leftButtonContainer.addView(close, 0);
-    leftContainerWidth
-    += close.getLayoutParams().width;
-}
-}
-
                 // Add the views to our toolbar
-toolbar.addView(leftButtonContainer);
+    toolbar.addView(leftButtonContainer);
                 // Don't show address bar.
                 // toolbar.addView(edittext);
-toolbar.addView(rightButtonContainer);
+    toolbar.addView(rightButtonContainer);
 
-if (title != null) {
-    int titleMargin = Math.max(
-                               leftContainerWidth, rightContainerWidth);
+    if (title != null) {
+      int titleMargin = Math.max(
+                                 leftContainerWidth, rightContainerWidth);
 
-    FrameLayout.LayoutParams titleParams
-    = (FrameLayout.LayoutParams) title.getLayoutParams();
-    titleParams.setMargins(titleMargin, 0, titleMargin, 0);
-    toolbar.addView(title);
-}
+      FrameLayout.LayoutParams titleParams
+      = (FrameLayout.LayoutParams) title.getLayoutParams();
+      titleParams.setMargins(titleMargin, 0, titleMargin, 0);
+      toolbar.addView(title);
+    }
 
-if (features.fullscreen) {
+    if (features.fullscreen) {
                     // If full screen mode, we have to add inAppWebView before adding toolbar.
-    main.addView(inAppWebView);
-}
+      main.addView(inAppWebView);
+    }
 
                 // Don't add the toolbar if its been disabled
-if (features.location) {
+    if (features.location) {
                     // Add our toolbar to our main view/layout
     //main.addView(toolbar);
-  main.addView(getHeaderView());
-}
+      main.addView(getHeaderView());
+    }
 
-if (!features.fullscreen) {
+    if (!features.fullscreen) {
                     // If not full screen, we add inAppWebView after adding toolbar.
-    main.addView(inAppWebView);
-}
+      main.addView(inAppWebView);
+    }
 
-WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
-lp.copyFrom(dialog.getWindow().getAttributes());
-lp.width = WindowManager.LayoutParams.MATCH_PARENT;
-lp.height = WindowManager.LayoutParams.MATCH_PARENT;
+    WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
+    lp.copyFrom(dialog.getWindow().getAttributes());
+    lp.width = WindowManager.LayoutParams.MATCH_PARENT;
+    lp.height = WindowManager.LayoutParams.MATCH_PARENT;
 
-dialog.setContentView(main);
-dialog.show();
-dialog.getWindow().setAttributes(lp);
+    dialog.setContentView(main);
+    dialog.show();
+    dialog.getWindow().setAttributes(lp);
                 // the goal of openhidden is to load the url and not display it
                 // Show() needs to be called to cause the URL to be loaded
-if(features.hidden) {
-    dialog.hide();
-}
-}
+    if(features.hidden) {
+      dialog.hide();
+    }
+  }
 };
 this.cordova.getActivity().runOnUiThread(runnable);
 return "";
@@ -1028,325 +1044,332 @@ return "";
        public void onClick(View v) {
         //Nothing to do
        }
-   });
+     });
 
      return footerLayout;
- }
+   }
 
- private LinearLayout getPriceItView(final String url){
+   private LinearLayout getPriceItView(final String url){
    //Footer
-   LinearLayout footerLayout = new LinearLayout(ctx);
-   footerLayout.setGravity(Gravity.CENTER);
-   footerLayout.setOrientation(LinearLayout.VERTICAL);
-   footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
-   LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
-   footerLayoutParams.setMargins(0,-150,0,0);
-   footerLayout.setLayoutParams(footerLayoutParams);
+     LinearLayout footerLayout = new LinearLayout(ctx);
+     footerLayout.setGravity(Gravity.CENTER);
+     footerLayout.setOrientation(LinearLayout.VERTICAL);
+     footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
+     LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+     footerLayoutParams.setMargins(0,-150,0,0);
+     footerLayout.setLayoutParams(footerLayoutParams);
 
 
    //Loading status messages
-   LinearLayout.LayoutParams imgWidgetParams = new LinearLayout.LayoutParams(300, 120);
-   
-   ImageView imgPriceIt = new ImageView(ctx);
+     LinearLayout.LayoutParams imgWidgetParams = new LinearLayout.LayoutParams(300, 120);
+
+     ImageView imgPriceIt = new ImageView(ctx);
    //imgPriceIt.setGravity(Gravity.CENTER);
-   imgPriceIt.setImageResource(R.drawable.ic_price_it);
-   imgPriceIt.setLayoutParams(imgWidgetParams);
-
-   
-   footerLayout.addView(imgPriceIt);
-
-   footerLayout.setOnClickListener(new View.OnClickListener() {
-     @Override
-     public void onClick(View v) {
-        try {
-            JSONObject obj = new JSONObject();
-            obj.put("type", PRICE_IT_EVENT);
-            obj.put("url", url);
-
-            sendUpdate(obj, true);
-
-        } catch (JSONException ex) {
-        }
-    }
-});
-   return footerLayout;
-}
-
-private LinearLayout getStatusView(String message){
-   //Footer
-   LinearLayout footerLayout = new LinearLayout(ctx);
-   footerLayout.setGravity(Gravity.CENTER);
-   footerLayout.setOrientation(LinearLayout.VERTICAL);
-   footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
-   LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
-   footerLayoutParams.setMargins(0,-150,0,0);
-   footerLayout.setLayoutParams(footerLayoutParams);
+     imgPriceIt.setImageResource(R.drawable.ic_price_it);
+     imgPriceIt.setLayoutParams(imgWidgetParams);
 
 
-   //Loading status messages
-   LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-   TextView tvState = new TextView(ctx);
-   tvState.setText(message);
-   tvState.setTextColor(hexStringToColor("#8A8A8A"));
-   tvState.setTypeface(null, Typeface.BOLD);
-   tvState.setLayoutParams(textWidgetParams);
-   footerLayout.addView(tvState);
+     footerLayout.addView(imgPriceIt);
 
-   footerLayout.setOnClickListener(new View.OnClickListener() {
-     @Override
-     public void onClick(View v) {
-    //
-     }
- });
-   return footerLayout;
-}
-
-private LinearLayout getProductFoundView(String savings, String points, final String id){
-   //Footer
- LinearLayout footerLayout = new LinearLayout(ctx);
- footerLayout.setGravity(Gravity.CENTER);
- footerLayout.setOrientation(LinearLayout.HORIZONTAL);
- footerLayout.setBackgroundColor(hexStringToColor("#1EC897"));
- LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
- footerLayoutParams.setMargins(0,-150,0,0);
- footerLayout.setLayoutParams(footerLayoutParams);
-
-
-
-   //Product found info
- LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
- TextView tvInfo = new TextView(ctx);
- tvInfo.setText("Save $"+savings);
- tvInfo.setGravity(Gravity.CENTER);
-
- tvInfo.setTypeface(null, Typeface.BOLD);
- tvInfo.setTextColor(hexStringToColor("#FFFFFF"));
- tvInfo.setLayoutParams(infoParams);
-
- if(stringsValidator(savings)){
-  tvInfo.setVisibility(View.VISIBLE);
-}else{
-  tvInfo.setVisibility(View.GONE);
-}
-
-footerLayout.addView(tvInfo);
-
-
-   //Claim
- TextView tvClaim = new TextView(ctx);
- tvClaim.setText("Earn "+points+" Price Points");
- tvClaim.setGravity(Gravity.CENTER);
- tvClaim.setTypeface(null, Typeface.BOLD);
- tvClaim.setTextColor(hexStringToColor("#FFFFFF"));
- tvClaim.setLayoutParams(infoParams);
-
-if(stringsValidator(points)){
-  tvClaim.setVisibility(View.VISIBLE);
-}else{
-  tvClaim.setVisibility(View.GONE);
-}
-
- footerLayout.addView(tvClaim);
-
-//Details
- LinearLayout loDetails = new LinearLayout(ctx);
- loDetails.setGravity(Gravity.CENTER);
- loDetails.setLayoutParams(infoParams);
-
-LinearLayout.LayoutParams detailViewsParam = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
- 
- //Detail Text
- TextView tvDetail = new TextView(ctx);
- tvDetail.setText("DETAILS");
- tvDetail.setGravity(Gravity.CENTER);
- //tvDetail.setTypeface(null, Typeface.BOLD);
- tvDetail.setTextColor(hexStringToColor("#FFFFFF"));
- tvDetail.setLayoutParams(detailViewsParam);
-loDetails.addView(tvDetail);
-
-//Arrow UP
- ImageView imgArowUp = new ImageView(ctx); 
- imgArowUp.setImageResource(R.drawable.ic_arrow_up);
- detailViewsParam.setMargins(10, 0, 0, 0);
- imgArowUp.setLayoutParams(detailViewsParam);
-loDetails.addView(imgArowUp);
-
-footerLayout.addView(loDetails);
-
-
-footerLayout.setOnClickListener(new View.OnClickListener() {
-     @Override
-     public void onClick(View v) {
-        
-    }
-});
-
-loDetails.setOnClickListener(new View.OnClickListener() {
-     @Override
-     public void onClick(View v) {
+     footerLayout.setOnClickListener(new View.OnClickListener() {
+       @Override
+       public void onClick(View v) {
         try {
           JSONObject obj = new JSONObject();
-          obj.put("type", OPEN_PDP_EVENT);
-          obj.put("id", id);
+          obj.put("type", PRICE_IT_EVENT);
+          obj.put("url", url);
 
           sendUpdate(obj, true);
 
         } catch (JSONException ex) {
         }
+      }
+    });
+     return footerLayout;
+   }
+
+   private LinearLayout getStatusView(String message){
+   //Footer
+     LinearLayout footerLayout = new LinearLayout(ctx);
+     footerLayout.setGravity(Gravity.CENTER);
+     footerLayout.setOrientation(LinearLayout.VERTICAL);
+     footerLayout.setBackgroundColor(hexStringToColor("#ECECEC"));
+     LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+     footerLayoutParams.setMargins(0,-150,0,0);
+     footerLayout.setLayoutParams(footerLayoutParams);
+
+
+   //Loading status messages
+     LinearLayout.LayoutParams textWidgetParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+     TextView tvState = new TextView(ctx);
+     tvState.setText(message);
+     tvState.setTextColor(hexStringToColor("#8A8A8A"));
+     tvState.setTypeface(null, Typeface.BOLD);
+     tvState.setLayoutParams(textWidgetParams);
+     footerLayout.addView(tvState);
+
+     footerLayout.setOnClickListener(new View.OnClickListener() {
+       @Override
+       public void onClick(View v) {
+    //
+       }
+     });
+     return footerLayout;
+   }
+
+   private LinearLayout getProductFoundView(String savings, String points, final String id){
+   //Footer
+     LinearLayout footerLayout = new LinearLayout(ctx);
+     footerLayout.setGravity(Gravity.CENTER);
+     footerLayout.setOrientation(LinearLayout.HORIZONTAL);
+     footerLayout.setBackgroundColor(hexStringToColor("#1EC897"));
+     LinearLayout.LayoutParams footerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+     footerLayoutParams.setMargins(0,-150,0,0);
+     footerLayout.setLayoutParams(footerLayoutParams);
+
+
+
+   //Product found info
+     LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+     TextView tvInfo = new TextView(ctx);
+     tvInfo.setText("Save $"+savings);
+     tvInfo.setGravity(Gravity.CENTER);
+
+     tvInfo.setTypeface(null, Typeface.BOLD);
+     tvInfo.setTextColor(hexStringToColor("#FFFFFF"));
+     tvInfo.setLayoutParams(infoParams);
+
+     if(stringsValidator(savings)){
+      tvInfo.setVisibility(View.VISIBLE);
+    }else{
+      tvInfo.setVisibility(View.GONE);
     }
-});
+
+    footerLayout.addView(tvInfo);
 
 
-return footerLayout;
-}
+   //Claim
+    TextView tvClaim = new TextView(ctx);
+    tvClaim.setText("Earn "+points+" Price Points");
+    tvClaim.setGravity(Gravity.CENTER);
+    tvClaim.setTypeface(null, Typeface.BOLD);
+    tvClaim.setTextColor(hexStringToColor("#FFFFFF"));
+    tvClaim.setLayoutParams(infoParams);
+
+    if(stringsValidator(points)){
+      tvClaim.setVisibility(View.VISIBLE);
+    }else{
+      tvClaim.setVisibility(View.GONE);
+    }
+
+    footerLayout.addView(tvClaim);
+
+//Details
+    LinearLayout loDetails = new LinearLayout(ctx);
+    loDetails.setGravity(Gravity.CENTER);
+    loDetails.setLayoutParams(infoParams);
+
+    LinearLayout.LayoutParams detailViewsParam = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+
+ //Detail Text
+    TextView tvDetail = new TextView(ctx);
+    tvDetail.setText("DETAILS");
+    tvDetail.setGravity(Gravity.CENTER);
+ //tvDetail.setTypeface(null, Typeface.BOLD);
+    tvDetail.setTextColor(hexStringToColor("#FFFFFF"));
+    tvDetail.setLayoutParams(detailViewsParam);
+    loDetails.addView(tvDetail);
+
+//Arrow UP
+    ImageView imgArowUp = new ImageView(ctx); 
+    imgArowUp.setImageResource(R.drawable.ic_arrow_up);
+    detailViewsParam.setMargins(10, 0, 0, 0);
+    imgArowUp.setLayoutParams(detailViewsParam);
+    loDetails.addView(imgArowUp);
+
+    footerLayout.addView(loDetails);
+
+
+    footerLayout.setOnClickListener(new View.OnClickListener() {
+     @Override
+     public void onClick(View v) {
+
+     }
+   });
+
+    loDetails.setOnClickListener(new View.OnClickListener() {
+     @Override
+     public void onClick(View v) {
+      try {
+        JSONObject obj = new JSONObject();
+        obj.put("type", OPEN_PDP_EVENT);
+        obj.put("id", id);
+
+        sendUpdate(obj, true);
+
+      } catch (JSONException ex) {
+      }
+    }
+  });
+
+
+    return footerLayout;
+  }
 
 
 /*********
 Header
 **********/
 private LinearLayout getHeaderView(){
-   int HEADER_HEIGHT = 150;
+ int HEADER_HEIGHT = 150;
    //Header root layout
-   LinearLayout headerLayout = new LinearLayout(ctx);
-   headerLayout.setGravity(Gravity.CENTER);
-   headerLayout.setOrientation(LinearLayout.HORIZONTAL);
-   headerLayout.setBackgroundColor(hexStringToColor("#1EC897"));
-   LinearLayout.LayoutParams headerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, HEADER_HEIGHT);
-   headerLayout.setLayoutParams(headerLayoutParams);
+ LinearLayout headerLayout = new LinearLayout(ctx);
+ headerLayout.setGravity(Gravity.CENTER);
+ headerLayout.setOrientation(LinearLayout.HORIZONTAL);
+ headerLayout.setBackgroundColor(hexStringToColor("#1EC897"));
+ LinearLayout.LayoutParams headerLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, HEADER_HEIGHT);
+ headerLayout.setLayoutParams(headerLayoutParams);
 
 
    //Header elements
-   LinearLayout.LayoutParams closeLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.15);
-   LinearLayout.LayoutParams backLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.15);
-   LinearLayout.LayoutParams logoLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.85);
+ LinearLayout.LayoutParams closeLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.15);
+ LinearLayout.LayoutParams backLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.15);
+ LinearLayout.LayoutParams logoLayoutParams = new LinearLayout.LayoutParams(0, HEADER_HEIGHT, (float)0.85);
 
 
    //Close Layout
-   LinearLayout closeLayout = new LinearLayout(ctx);
-   closeLayout.setGravity(Gravity.CENTER);
-   closeLayout.setOrientation(LinearLayout.HORIZONTAL);
-   closeLayout.setLayoutParams(closeLayoutParams);
+ LinearLayout closeLayout = new LinearLayout(ctx);
+ closeLayout.setGravity(Gravity.CENTER);
+ closeLayout.setOrientation(LinearLayout.HORIZONTAL);
+ closeLayout.setLayoutParams(closeLayoutParams);
 
 
    //Close Image
-   LinearLayout.LayoutParams imgCloseParams = new LinearLayout.LayoutParams(50, 50);
-   ImageView imgClose = new ImageView(ctx);
-   imgClose.setImageResource(R.drawable.ic_close);
-   imgClose.setLayoutParams(imgCloseParams);
-   closeLayout.addView(imgClose);
+ LinearLayout.LayoutParams imgCloseParams = new LinearLayout.LayoutParams(50, 50);
+ ImageView imgClose = new ImageView(ctx);
+ imgClose.setImageResource(R.drawable.ic_close);
+ imgClose.setLayoutParams(imgCloseParams);
+ closeLayout.addView(imgClose);
 
 
 
    //Close Click Listener
-   closeLayout.setOnClickListener(new View.OnClickListener() {
-       @Override
-       public void onClick(View v) {
-           closeDialog();
-       }
-   });
+ closeLayout.setOnClickListener(new View.OnClickListener() {
+   @Override
+   public void onClick(View v) {
+     closeDialog();
+   }
+ });
 
 
 
 
    //Back Layout
-   LinearLayout backLayout = new LinearLayout(ctx);
-   backLayout.setGravity(Gravity.CENTER);
-   backLayout.setOrientation(LinearLayout.HORIZONTAL);
-   backLayout.setLayoutParams(backLayoutParams);
+ LinearLayout backLayout = new LinearLayout(ctx);
+ backLayout.setGravity(Gravity.CENTER);
+ backLayout.setOrientation(LinearLayout.HORIZONTAL);
+ backLayout.setLayoutParams(backLayoutParams);
 
 
    //Back Image
-   LinearLayout.LayoutParams imgBackParams = new LinearLayout.LayoutParams(50, 50);
-   ImageView imgBack = new ImageView(ctx);
-   imgBack.setImageResource(R.drawable.ic_back);
-   imgBack.setLayoutParams(imgBackParams);
-   backLayout.addView(imgBack);
+ LinearLayout.LayoutParams imgBackParams = new LinearLayout.LayoutParams(50, 50);
+ ImageView imgBack = new ImageView(ctx);
+ imgBack.setImageResource(R.drawable.ic_back);
+ imgBack.setLayoutParams(imgBackParams);
+ backLayout.addView(imgBack);
 
 
    //Back Text
-   LinearLayout.LayoutParams txtBackParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-   TextView tvBack = new TextView(ctx);
-   tvBack.setText("BACK");
-   tvBack.setTypeface(Typeface.DEFAULT_BOLD);
-   tvBack.setGravity(Gravity.CENTER);
-   tvBack.setTextSize(TypedValue.COMPLEX_UNIT_SP,8);
-   tvBack.setTextColor(hexStringToColor("#FFFFFF"));
-   tvBack.setLayoutParams(txtBackParams);
-   backLayout.addView(tvBack);
+ LinearLayout.LayoutParams txtBackParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+ TextView tvBack = new TextView(ctx);
+ tvBack.setText("BACK");
+ tvBack.setTypeface(Typeface.DEFAULT_BOLD);
+ tvBack.setGravity(Gravity.CENTER);
+ tvBack.setTextSize(TypedValue.COMPLEX_UNIT_SP,10);
+ tvBack.setTextColor(hexStringToColor("#FFFFFF"));
+ tvBack.setLayoutParams(txtBackParams);
+ backLayout.addView(tvBack);
 
 
    //Back Click Listener
-   backLayout.setOnClickListener(new View.OnClickListener() {
-       @Override
-       public void onClick(View v) {
-           goBack();
-       }
-   });
+ backLayout.setOnClickListener(new View.OnClickListener() {
+   @Override
+   public void onClick(View v) {
+     goBack();
+   }
+ });
 
 
    //Logo Layout
-   LinearLayout logoLayout = new LinearLayout(ctx);
-   logoLayout.setGravity(Gravity.CENTER);
-   logoLayout.setOrientation(LinearLayout.HORIZONTAL);
-   logoLayout.setLayoutParams(logoLayoutParams);
+ LinearLayout logoLayout = new LinearLayout(ctx);
+ logoLayout.setGravity(Gravity.CENTER);
+ logoLayout.setOrientation(LinearLayout.HORIZONTAL);
+ logoLayout.setLayoutParams(logoLayoutParams);
 
 
    //Logo Image
-   LinearLayout.LayoutParams imgLogoParams = new LinearLayout.LayoutParams(200, 70);
-   imgLogoParams.setMargins(0,0,300,0);
+ LinearLayout.LayoutParams imgLogoParams = new LinearLayout.LayoutParams(200, 70);
+ imgLogoParams.setMargins(0,0,300,0);
 
 
-   ImageView imgLogo = new ImageView(ctx);
-   imgLogo.setImageResource(R.drawable.ic_amazon);
-   imgLogo.setLayoutParams(imgLogoParams);
-   logoLayout.addView(imgLogo);
+ ImageView imgLogo = new ImageView(ctx);
+ imgLogo.setImageResource(R.drawable.ic_amazon);
+ imgLogo.setLayoutParams(imgLogoParams);
+ logoLayout.addView(imgLogo);
 
 
    //Add all layouts in header root layout
-   headerLayout.addView(closeLayout);
-   headerLayout.addView(backLayout);
-   headerLayout.addView(logoLayout);
+ headerLayout.addView(closeLayout);
+ headerLayout.addView(backLayout);
+ headerLayout.addView(logoLayout);
 
+//Load store logo
+ if(storeLogo != null){
+   loadImage(storeLogo, imgLogo);
+ }
 
-   return headerLayout;
+ return headerLayout;
 }
 
+private void loadImage(String url, ImageView logoView){
+   imageLoader.displayImage(url, logoView, imageLoadingOptions);
+}
 
 private String getMessageFromStatusCode(int code){
-    String message = null;
-    switch(code) {
-        case 0:
-        message =  "Search failed. Try another product.";
-        break;
-        
-        case 1:
-        message =  "Searching for best price...";
-        break;
-        
-        case 2:
-        message =  "Error... Please restart the app!";
-        break;
-        
-        case 3:
-        message =  "Sorry! This store is not yet supported.";
-        break;
+  String message = null;
+  switch(code) {
+    case 0:
+    message =  "Search failed. Try another product.";
+    break;
 
-        default:
-        message =  "Unknown error... Try again.";
-        break;
-    }
-    return message;
+    case 1:
+    message =  "Searching for best price...";
+    break;
+
+    case 2:
+    message =  "Error... Please restart the app!";
+    break;
+
+    case 3:
+    message =  "Sorry! This store is not yet supported.";
+    break;
+
+    default:
+    message =  "Unknown error... Try again.";
+    break;
+  }
+  return message;
 }
 
 //String validation
-    private boolean stringsValidator(String... inputs) {
-        for (String currentString : inputs) {
-            if (currentString == null || currentString.equals("") || currentString.length() < 1 || currentString.equals(" ") || currentString.equals("null")) {
-                return false;
-            }
-        }
-        return true;
+private boolean stringsValidator(String... inputs) {
+  for (String currentString : inputs) {
+    if (currentString == null || currentString.equals("") || currentString.length() < 1 || currentString.equals(" ") || currentString.equals("null")) {
+      return false;
     }
+  }
+  return true;
+}
 
 
 
@@ -1356,37 +1379,37 @@ private String getMessageFromStatusCode(int code){
      * @return int
      */
     private int dpToPixels(int dipValue) {
-        int value = (int) TypedValue.applyDimension(
-                                                    TypedValue.COMPLEX_UNIT_DIP,
-                                                    (float) dipValue,
-                                                    cordova.getActivity().getResources().getDisplayMetrics()
-                                                    );
+      int value = (int) TypedValue.applyDimension(
+                                                  TypedValue.COMPLEX_UNIT_DIP,
+                                                  (float) dipValue,
+                                                  cordova.getActivity().getResources().getDisplayMetrics()
+                                                  );
 
-        return value;
+      return value;
     }
 
     private int hexStringToColor(String hex) {
-        int result = 0;
+      int result = 0;
 
-        if (hex != null && !hex.isEmpty()) {
-            if (hex.charAt(0) == '#') {
-                hex = hex.substring(1);
-            }
+      if (hex != null && !hex.isEmpty()) {
+        if (hex.charAt(0) == '#') {
+          hex = hex.substring(1);
+        }
 
             // No alpha, that's fine, we will just attach ff.
-            if (hex.length() < 8) {
-                hex += "ff";
-            }
+        if (hex.length() < 8) {
+          hex += "ff";
+        }
 
-            result = (int) Long.parseLong(hex, 16);
+        result = (int) Long.parseLong(hex, 16);
 
             // Almost done, but Android color code is in form of ARGB instead of
             // RGBA, so we gotta shift it a bit.
-            int alpha = (result & 0xff) << 24;
-            result = result >> 8 & 0xffffff | alpha;
-        }
+        int alpha = (result & 0xff) << 24;
+        result = result >> 8 & 0xffffff | alpha;
+      }
 
-        return result;
+      return result;
     }
 
     /**
@@ -1401,155 +1424,155 @@ private String getMessageFromStatusCode(int code){
     * explicitly.
     */
     private Drawable getImage(String name, String altPath, double altDensity) throws IOException {
-        Drawable result = null;
-        Resources activityRes = cordova.getActivity().getResources();
+      Drawable result = null;
+      Resources activityRes = cordova.getActivity().getResources();
 
-        if (name != null) {
-            int id = activityRes.getIdentifier(name, "drawable",
-                                               cordova.getActivity().getPackageName());
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-                result = activityRes.getDrawable(id);
-            } else {
-                result = activityRes.getDrawable(id, cordova.getActivity().getTheme());
-            }
-        } else if (altPath != null) {
-            File file = new File("www", altPath);
-            InputStream is = null;
-            try {
-                is = cordova.getActivity().getAssets().open(file.getPath());
-                Bitmap bitmap = BitmapFactory.decodeStream(is);
-                bitmap.setDensity((int) (DisplayMetrics.DENSITY_MEDIUM * altDensity));
-                result = new BitmapDrawable(activityRes, bitmap);
-            } finally {
-                // Make sure we close this input stream to prevent resource leak.
-                try {
-                    is.close();
-                } catch (Exception e) {}
-            }
+      if (name != null) {
+        int id = activityRes.getIdentifier(name, "drawable",
+                                           cordova.getActivity().getPackageName());
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+          result = activityRes.getDrawable(id);
+        } else {
+          result = activityRes.getDrawable(id, cordova.getActivity().getTheme());
         }
-        return result;
+      } else if (altPath != null) {
+        File file = new File("www", altPath);
+        InputStream is = null;
+        try {
+          is = cordova.getActivity().getAssets().open(file.getPath());
+          Bitmap bitmap = BitmapFactory.decodeStream(is);
+          bitmap.setDensity((int) (DisplayMetrics.DENSITY_MEDIUM * altDensity));
+          result = new BitmapDrawable(activityRes, bitmap);
+        } finally {
+                // Make sure we close this input stream to prevent resource leak.
+          try {
+            is.close();
+          } catch (Exception e) {}
+        }
+      }
+      return result;
     }
 
     private void setButtonImages(View view, BrowserButton buttonProps, int disabledAlpha) {
-        Drawable normalDrawable = null;
-        Drawable disabledDrawable = null;
-        Drawable pressedDrawable = null;
+      Drawable normalDrawable = null;
+      Drawable disabledDrawable = null;
+      Drawable pressedDrawable = null;
 
-        CharSequence description = view.getContentDescription();
+      CharSequence description = view.getContentDescription();
 
-        if (buttonProps.image != null || buttonProps.wwwImage != null) {
-            try {
-                normalDrawable = getImage(buttonProps.image, buttonProps.wwwImage,
-                                          buttonProps.wwwImageDensity);
-                ViewGroup.LayoutParams params = view.getLayoutParams();
-                params.width = normalDrawable.getIntrinsicWidth();
-                params.height = normalDrawable.getIntrinsicHeight();
-            } catch (Resources.NotFoundException e) {
-                emitError(ERR_LOADFAIL,
-                          String.format("Image for %s, %s, failed to load",
-                                        description, buttonProps.image));
-            } catch (IOException ioe) {
-                emitError(ERR_LOADFAIL,
-                          String.format("Image for %s, %s, failed to load",
-                                        description, buttonProps.wwwImage));
-            }
-        } else {
-            emitWarning(WRN_UNDEFINED,
-                        String.format("Image for %s is not defined. Button will not be shown",
-                                      description));
+      if (buttonProps.image != null || buttonProps.wwwImage != null) {
+        try {
+          normalDrawable = getImage(buttonProps.image, buttonProps.wwwImage,
+                                    buttonProps.wwwImageDensity);
+          ViewGroup.LayoutParams params = view.getLayoutParams();
+          params.width = normalDrawable.getIntrinsicWidth();
+          params.height = normalDrawable.getIntrinsicHeight();
+        } catch (Resources.NotFoundException e) {
+          emitError(ERR_LOADFAIL,
+                    String.format("Image for %s, %s, failed to load",
+                                  description, buttonProps.image));
+        } catch (IOException ioe) {
+          emitError(ERR_LOADFAIL,
+                    String.format("Image for %s, %s, failed to load",
+                                  description, buttonProps.wwwImage));
         }
+      } else {
+        emitWarning(WRN_UNDEFINED,
+                    String.format("Image for %s is not defined. Button will not be shown",
+                                  description));
+      }
 
-        if (buttonProps.imagePressed != null || buttonProps.wwwImagePressed != null) {
-            try {
-                pressedDrawable = getImage(buttonProps.imagePressed, buttonProps.wwwImagePressed,
-                                           buttonProps.wwwImageDensity);
-            } catch (Resources.NotFoundException e) {
-                emitError(ERR_LOADFAIL,
-                          String.format("Pressed image for %s, %s, failed to load",
-                                        description, buttonProps.imagePressed));
-            } catch (IOException e) {
-                emitError(ERR_LOADFAIL,
-                          String.format("Pressed image for %s, %s, failed to load",
-                                        description, buttonProps.wwwImagePressed));
-            }
-        } else {
-            emitWarning(WRN_UNDEFINED,
-                        String.format("Pressed image for %s is not defined.",
-                                      description));
+      if (buttonProps.imagePressed != null || buttonProps.wwwImagePressed != null) {
+        try {
+          pressedDrawable = getImage(buttonProps.imagePressed, buttonProps.wwwImagePressed,
+                                     buttonProps.wwwImageDensity);
+        } catch (Resources.NotFoundException e) {
+          emitError(ERR_LOADFAIL,
+                    String.format("Pressed image for %s, %s, failed to load",
+                                  description, buttonProps.imagePressed));
+        } catch (IOException e) {
+          emitError(ERR_LOADFAIL,
+                    String.format("Pressed image for %s, %s, failed to load",
+                                  description, buttonProps.wwwImagePressed));
         }
+      } else {
+        emitWarning(WRN_UNDEFINED,
+                    String.format("Pressed image for %s is not defined.",
+                                  description));
+      }
 
-        if (normalDrawable != null) {
+      if (normalDrawable != null) {
             // Create the disabled state drawable by fading the normal state
             // drawable. Drawable.setAlpha() stopped working above Android 4.4
             // so we gotta bring out some bitmap magic. Credit goes to:
             // http://stackoverflow.com/a/7477572
-            Bitmap enabledBitmap = ((BitmapDrawable) normalDrawable).getBitmap();
-            Bitmap disabledBitmap = Bitmap.createBitmap(
-                                                        normalDrawable.getIntrinsicWidth(),
-                                                        normalDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(disabledBitmap);
+        Bitmap enabledBitmap = ((BitmapDrawable) normalDrawable).getBitmap();
+        Bitmap disabledBitmap = Bitmap.createBitmap(
+                                                    normalDrawable.getIntrinsicWidth(),
+                                                    normalDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(disabledBitmap);
 
-            Paint paint = new Paint();
-            paint.setAlpha(disabledAlpha);
-            canvas.drawBitmap(enabledBitmap, 0, 0, paint);
+        Paint paint = new Paint();
+        paint.setAlpha(disabledAlpha);
+        canvas.drawBitmap(enabledBitmap, 0, 0, paint);
 
-            Resources activityRes = cordova.getActivity().getResources();
-            disabledDrawable = new BitmapDrawable(activityRes, disabledBitmap);
-        }
+        Resources activityRes = cordova.getActivity().getResources();
+        disabledDrawable = new BitmapDrawable(activityRes, disabledBitmap);
+      }
 
-        StateListDrawable states = new StateListDrawable();
-        if (pressedDrawable != null) {
-            states.addState(
-                            new int[] {
-                                android.R.attr.state_pressed
-                            },
-                            pressedDrawable
-                            );
-        }
-        if (normalDrawable != null) {
-            states.addState(
-                            new int[] {
-                                android.R.attr.state_enabled
-                            },
-                            normalDrawable
-                            );
-        }
-        if (disabledDrawable != null) {
-            states.addState(
-                            new int[] {},
-                            disabledDrawable
-                            );
-        }
+      StateListDrawable states = new StateListDrawable();
+      if (pressedDrawable != null) {
+        states.addState(
+                        new int[] {
+                          android.R.attr.state_pressed
+                        },
+                        pressedDrawable
+                        );
+      }
+      if (normalDrawable != null) {
+        states.addState(
+                        new int[] {
+                          android.R.attr.state_enabled
+                        },
+                        normalDrawable
+                        );
+      }
+      if (disabledDrawable != null) {
+        states.addState(
+                        new int[] {},
+                        disabledDrawable
+                        );
+      }
 
-        setBackground(view, states);
+      setBackground(view, states);
     }
 
     private void setBackground(View view, Drawable drawable) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
-            view.setBackgroundDrawable(drawable);
-        } else {
-            view.setBackground(drawable);
-        }
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN) {
+        view.setBackgroundDrawable(drawable);
+      } else {
+        view.setBackground(drawable);
+      }
     }
 
     private Button createButton(BrowserButton buttonProps, String description,
                                 View.OnClickListener listener) {
-        Button result = null;
-        if (buttonProps != null) {
-            result = new Button(cordova.getActivity());
-            result.setContentDescription(description);
-            result.setLayoutParams(new LinearLayout.LayoutParams(
-                                                                 LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-            setButtonImages(result, buttonProps, DISABLED_ALPHA);
-            if (listener != null) {
-                result.setOnClickListener(listener);
-            }
-        } else {
-            emitWarning(WRN_UNDEFINED,
-                        String.format("%s is not defined. Button will not be shown.",
-                                      description));
+      Button result = null;
+      if (buttonProps != null) {
+        result = new Button(cordova.getActivity());
+        result.setContentDescription(description);
+        result.setLayoutParams(new LinearLayout.LayoutParams(
+                                                             LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        setButtonImages(result, buttonProps, DISABLED_ALPHA);
+        if (listener != null) {
+          result.setOnClickListener(listener);
         }
-        return result;
+      } else {
+        emitWarning(WRN_UNDEFINED,
+                    String.format("%s is not defined. Button will not be shown.",
+                                  description));
+      }
+      return result;
     }
 
     /**
@@ -1558,7 +1581,7 @@ private String getMessageFromStatusCode(int code){
      * @param obj a JSONObject contain event payload information
      */
     private void sendUpdate(JSONObject obj, boolean keepCallback) {
-        sendUpdate(obj, keepCallback, PluginResult.Status.OK);
+      sendUpdate(obj, keepCallback, PluginResult.Status.OK);
     }
 
     /**
@@ -1568,27 +1591,27 @@ private String getMessageFromStatusCode(int code){
      * @param status the status code to return to the JavaScript environment
      */
     private void sendUpdate(JSONObject obj, boolean keepCallback, PluginResult.Status status) {
-        if (callbackContext != null) {
-            PluginResult result = new PluginResult(status, obj);
-            result.setKeepCallback(keepCallback);
-            callbackContext.sendPluginResult(result);
-            if (!keepCallback) {
-                callbackContext = null;
-            }
+      if (callbackContext != null) {
+        PluginResult result = new PluginResult(status, obj);
+        result.setKeepCallback(keepCallback);
+        callbackContext.sendPluginResult(result);
+        if (!keepCallback) {
+          callbackContext = null;
         }
+      }
     }
 
     public static interface PageLoadListener {
-        public void onPageFinished(String url, boolean canGoBack,
-                                   boolean canGoForward);
+      public void onPageFinished(String url, boolean canGoBack,
+                                 boolean canGoForward);
     }
 
     /**
      * The webview client receives notifications about appView
      */
     public class ThemeableBrowserClient extends WebViewClient {
-        PageLoadListener callback;
-        CordovaWebView webView;
+      PageLoadListener callback;
+      CordovaWebView webView;
 
         /**
          * Constructor.
@@ -1598,8 +1621,8 @@ private String getMessageFromStatusCode(int code){
          */
         public ThemeableBrowserClient(CordovaWebView webView,
                                       PageLoadListener callback) {
-            this.webView = webView;
-            this.callback = callback;
+          this.webView = webView;
+          this.callback = callback;
         }
 
         /**
@@ -1612,57 +1635,57 @@ private String getMessageFromStatusCode(int code){
          */
         @Override
         public boolean shouldOverrideUrlLoading(WebView webView, String url) {
-            if (url.startsWith(WebView.SCHEME_TEL)) {
-                try {
-                    Intent intent = new Intent(Intent.ACTION_DIAL);
-                    intent.setData(Uri.parse(url));
-                    cordova.getActivity().startActivity(intent);
-                    return true;
-                } catch (android.content.ActivityNotFoundException e) {
-                    Log.e(LOG_TAG, "Error dialing " + url + ": " + e.toString());
-                }
-            } else if (url.startsWith("geo:") || url.startsWith(WebView.SCHEME_MAILTO) || url.startsWith("market:")) {
-                try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setData(Uri.parse(url));
-                    cordova.getActivity().startActivity(intent);
-                    return true;
-                } catch (android.content.ActivityNotFoundException e) {
-                    Log.e(LOG_TAG, "Error with " + url + ": " + e.toString());
-                }
+          if (url.startsWith(WebView.SCHEME_TEL)) {
+            try {
+              Intent intent = new Intent(Intent.ACTION_DIAL);
+              intent.setData(Uri.parse(url));
+              cordova.getActivity().startActivity(intent);
+              return true;
+            } catch (android.content.ActivityNotFoundException e) {
+              Log.e(LOG_TAG, "Error dialing " + url + ": " + e.toString());
             }
+          } else if (url.startsWith("geo:") || url.startsWith(WebView.SCHEME_MAILTO) || url.startsWith("market:")) {
+            try {
+              Intent intent = new Intent(Intent.ACTION_VIEW);
+              intent.setData(Uri.parse(url));
+              cordova.getActivity().startActivity(intent);
+              return true;
+            } catch (android.content.ActivityNotFoundException e) {
+              Log.e(LOG_TAG, "Error with " + url + ": " + e.toString());
+            }
+          }
             // If sms:5551212?body=This is the message
-            else if (url.startsWith("sms:")) {
-                try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
+          else if (url.startsWith("sms:")) {
+            try {
+              Intent intent = new Intent(Intent.ACTION_VIEW);
 
                     // Get address
-                    String address = null;
-                    int parmIndex = url.indexOf('?');
-                    if (parmIndex == -1) {
-                        address = url.substring(4);
-                    } else {
-                        address = url.substring(4, parmIndex);
+              String address = null;
+              int parmIndex = url.indexOf('?');
+              if (parmIndex == -1) {
+                address = url.substring(4);
+              } else {
+                address = url.substring(4, parmIndex);
 
                         // If body, then set sms body
-                        Uri uri = Uri.parse(url);
-                        String query = uri.getQuery();
-                        if (query != null) {
-                            if (query.startsWith("body=")) {
-                                intent.putExtra("sms_body", query.substring(5));
-                            }
-                        }
-                    }
-                    intent.setData(Uri.parse("sms:" + address));
-                    intent.putExtra("address", address);
-                    intent.setType("vnd.android-dir/mms-sms");
-                    cordova.getActivity().startActivity(intent);
-                    return true;
-                } catch (android.content.ActivityNotFoundException e) {
-                    Log.e(LOG_TAG, "Error sending sms " + url + ":" + e.toString());
+                Uri uri = Uri.parse(url);
+                String query = uri.getQuery();
+                if (query != null) {
+                  if (query.startsWith("body=")) {
+                    intent.putExtra("sms_body", query.substring(5));
+                  }
                 }
+              }
+              intent.setData(Uri.parse("sms:" + address));
+              intent.putExtra("address", address);
+              intent.setType("vnd.android-dir/mms-sms");
+              cordova.getActivity().startActivity(intent);
+              return true;
+            } catch (android.content.ActivityNotFoundException e) {
+              Log.e(LOG_TAG, "Error sending sms " + url + ":" + e.toString());
             }
-            return false;
+          }
+          return false;
         }
 
 
@@ -1675,99 +1698,99 @@ private String getMessageFromStatusCode(int code){
          */
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
-            super.onPageStarted(view, url, favicon);
-            String newloc = "";
-            if (url.startsWith("http:") || url.startsWith("https:") || url.startsWith("file:")) {
-                newloc = url;
-            }
-            else
-            {
+          super.onPageStarted(view, url, favicon);
+          String newloc = "";
+          if (url.startsWith("http:") || url.startsWith("https:") || url.startsWith("file:")) {
+            newloc = url;
+          }
+          else
+          {
                 // Assume that everything is HTTP at this point, because if we don't specify,
                 // it really should be.  Complain loudly about this!!!
-                Log.e(LOG_TAG, "Possible Uncaught/Unknown URI");
-                newloc = "http://" + url;
-            }
+            Log.e(LOG_TAG, "Possible Uncaught/Unknown URI");
+            newloc = "http://" + url;
+          }
 
             // Update the UI if we haven't already
-            if (!newloc.equals(edittext.getText().toString())) {
-                edittext.setText(newloc);
-            }
+          if (!newloc.equals(edittext.getText().toString())) {
+            edittext.setText(newloc);
+          }
 
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("type", LOAD_START_EVENT);
-                obj.put("url", newloc);
-                sendUpdate(obj, true);
-            } catch (JSONException ex) {
-                Log.e(LOG_TAG, "URI passed in has caused a JSON error.");
-            }
+          try {
+            JSONObject obj = new JSONObject();
+            obj.put("type", LOAD_START_EVENT);
+            obj.put("url", newloc);
+            sendUpdate(obj, true);
+          } catch (JSONException ex) {
+            Log.e(LOG_TAG, "URI passed in has caused a JSON error.");
+          }
 
             //Add loading view in footer area
-            main.addView(getLoadingView());
+          main.addView(getLoadingView());
         }
 
         public void onPageFinished(WebView view, String url) {
-            super.onPageFinished(view, url);
+          super.onPageFinished(view, url);
 
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("type", LOAD_STOP_EVENT);
-                obj.put("url", url);
+          try {
+            JSONObject obj = new JSONObject();
+            obj.put("type", LOAD_STOP_EVENT);
+            obj.put("url", url);
 
-                sendUpdate(obj, true);
+            sendUpdate(obj, true);
 
-                if (this.callback != null) {
-                    this.callback.onPageFinished(url, view.canGoBack(),
-                                                 view.canGoForward());
-                }
+            if (this.callback != null) {
+              this.callback.onPageFinished(url, view.canGoBack(),
+                                           view.canGoForward());
+            }
 
                 //Add Price it view in Footer area
-                main.addView(getPriceItView(url));
+            main.addView(getPriceItView(url));
 
-            } catch (JSONException ex) {
-            }
+          } catch (JSONException ex) {
+          }
         }
 
         public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-            super.onReceivedError(view, errorCode, description, failingUrl);
+          super.onReceivedError(view, errorCode, description, failingUrl);
 
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("type", LOAD_ERROR_EVENT);
-                obj.put("url", failingUrl);
-                obj.put("code", errorCode);
-                obj.put("message", description);
+          try {
+            JSONObject obj = new JSONObject();
+            obj.put("type", LOAD_ERROR_EVENT);
+            obj.put("url", failingUrl);
+            obj.put("code", errorCode);
+            obj.put("message", description);
 
-                sendUpdate(obj, true, PluginResult.Status.ERROR);
-            } catch (JSONException ex) {
-            }
+            sendUpdate(obj, true, PluginResult.Status.ERROR);
+          } catch (JSONException ex) {
+          }
         }
-    }
+      }
 
     /**
      * Like Spinner but will always trigger onItemSelected even if a selected
      * item is selected, and always ignore default selection.
      */
     public class MenuSpinner extends Spinner {
-        private OnItemSelectedListener listener;
+      private OnItemSelectedListener listener;
 
-        public MenuSpinner(Context context) {
-            super(context);
+      public MenuSpinner(Context context) {
+        super(context);
+      }
+
+      @Override
+      public void setSelection(int position) {
+        super.setSelection(position);
+
+        if (listener != null) {
+          listener.onItemSelected(null, this, position, 0);
         }
+      }
 
-        @Override
-        public void setSelection(int position) {
-            super.setSelection(position);
-
-            if (listener != null) {
-                listener.onItemSelected(null, this, position, 0);
-            }
-        }
-
-        @Override
-        public void setOnItemSelectedListener(OnItemSelectedListener listener) {
-            this.listener = listener;
-        }
+      @Override
+      public void setOnItemSelectedListener(OnItemSelectedListener listener) {
+        this.listener = listener;
+      }
     }
 
     /**
@@ -1777,15 +1800,15 @@ private String getMessageFromStatusCode(int code){
      */
     private static class HideSelectedAdapter<T> extends ArrayAdapter {
 
-        public HideSelectedAdapter(Context context, int resource, T[] objects) {
-            super(context, resource, objects);
-        }
+      public HideSelectedAdapter(Context context, int resource, T[] objects) {
+        super(context, resource, objects);
+      }
 
-        public View getView (int position, View convertView, ViewGroup parent) {
-            View v = super.getView(position, convertView, parent);
-            v.setVisibility(View.GONE);
-            return v;
-        }
+      public View getView (int position, View convertView, ViewGroup parent) {
+        View v = super.getView(position, convertView, parent);
+        v.setVisibility(View.GONE);
+        return v;
+      }
     }
 
 
@@ -1793,61 +1816,92 @@ private String getMessageFromStatusCode(int code){
      * A class to hold parsed option properties.
      */
     private static class Options {
-        public boolean location = true;
-        public boolean hidden = false;
-        public boolean clearcache = false;
-        public boolean clearsessioncache = false;
-        public boolean zoom = true;
-        public boolean hardwareback = true;
+      public boolean location = true;
+      public boolean hidden = false;
+      public boolean clearcache = false;
+      public boolean clearsessioncache = false;
+      public boolean zoom = true;
+      public boolean hardwareback = true;
 
-        public Toolbar toolbar;
-        public Title title;
-        public BrowserButton backButton;
-        public BrowserButton forwardButton;
-        public BrowserButton closeButton;
-        public BrowserMenu menu;
-        public BrowserButton[] customButtons;
-        public boolean backButtonCanClose;
-        public boolean disableAnimation;
-        public boolean fullscreen;
+      public Toolbar toolbar;
+      public Title title;
+      public BrowserButton backButton;
+      public BrowserButton forwardButton;
+      public BrowserButton closeButton;
+      public BrowserMenu menu;
+      public BrowserButton[] customButtons;
+      public boolean backButtonCanClose;
+      public boolean disableAnimation;
+      public boolean fullscreen;
+      public String logoUrl;
     }
 
     private static class Event {
-        public String event;
+      public String event;
     }
 
     private static class EventLabel extends Event {
-        public String label;
+      public String label;
 
-        public String toString() {
-            return label;
-        }
+      public String toString() {
+        return label;
+      }
     }
 
     private static class BrowserButton extends Event {
-        public String image;
-        public String wwwImage;
-        public String imagePressed;
-        public String wwwImagePressed;
-        public double wwwImageDensity = 1;
-        public String align = ALIGN_LEFT;
+      public String image;
+      public String wwwImage;
+      public String imagePressed;
+      public String wwwImagePressed;
+      public double wwwImageDensity = 1;
+      public String align = ALIGN_LEFT;
     }
 
     private static class BrowserMenu extends BrowserButton {
-        public EventLabel[] items;
+      public EventLabel[] items;
     }
 
     private static class Toolbar {
-        public int height = TOOLBAR_DEF_HEIGHT;
-        public String color;
-        public String image;
-        public String wwwImage;
-        public double wwwImageDensity = 1;
+      public int height = TOOLBAR_DEF_HEIGHT;
+      public String color;
+      public String image;
+      public String wwwImage;
+      public double wwwImageDensity = 1;
     }
 
     private static class Title {
-        public String color;
-        public String staticText;
-        public boolean showPageTitle;
+      public String color;
+      public String staticText;
+      public boolean showPageTitle;
     }
-}
+
+    /*******
+      Image Loader
+    *******/
+      public void initLoaderLibrary(){
+       DisplayImageOptions defaultOptions = new DisplayImageOptions.Builder()
+       .cacheOnDisc(true).cacheInMemory(true)
+       .imageScaleType(ImageScaleType.EXACTLY)
+       .bitmapConfig(Bitmap.Config.ARGB_4444)
+       .displayer(new FadeInBitmapDisplayer(300))
+       .build();
+
+
+       ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(
+                                                                              ctx)
+       .defaultDisplayImageOptions(defaultOptions)
+       .memoryCache(new WeakMemoryCache())
+       .discCacheSize(100 * 1024 * 1024).build();
+
+
+       ImageLoader.getInstance().init(config);
+     }
+
+     private void initLoader(){
+       imageLoader = com.nostra13.universalimageloader.core.ImageLoader.getInstance();
+       imageLoadingOptions = new DisplayImageOptions.Builder().cacheInMemory(true)
+       .cacheOnDisc(true).resetViewBeforeLoading(true)
+       .build();
+     }
+
+   }
