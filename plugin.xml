@@ -55,6 +55,9 @@
   <source-file src="src/android/res/drawable/ic_close.png" target-dir="res/drawable/" />
   <source-file src="src/android/res/drawable/ic_back.png" target-dir="res/drawable/" />
   <source-file src="src/android/res/drawable/ic_amazon.png" target-dir="res/drawable/" />
+
+  
+  <framework src="src/android/themeablebrowser.gradle" custom="true" type="gradleReference"/>
 </platform>
 
 <!-- ios -->
