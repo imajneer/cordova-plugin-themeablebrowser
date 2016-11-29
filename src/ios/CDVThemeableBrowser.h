@@ -77,6 +77,7 @@
 - (void)open:(CDVInvokedUrlCommand*)command;
 - (void)close:(CDVInvokedUrlCommand*)command;
 - (void)foundProduct:(CDVInvokedUrlCommand*)command;
+- (void)priceIt;
 - (void)injectScriptCode:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command withAnimation:(BOOL)animated;
@@ -114,13 +115,18 @@
 @property (nonatomic, strong) IBOutlet UIButton* menuButton;
 @property (nonatomic, strong) IBOutlet UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) IBOutlet UIView* toolbar;
-@property (nonatomic, strong)UILabel* savingsLabel;
+@property (nonatomic, strong)UILabel* savingsLabel, *loadingLabel;
+@property (nonatomic, strong)UIButton *priceItButton, *detailButton, *arrowButton;
+@property (nonatomic, strong)UIProgressView *progressBar;
+@property (nonatomic)float progress;
+@property (nonatomic, strong)UIView *loadingView, *savingsView, *footerView;
 
 @property (nonatomic, strong) NSArray* leftButtons;
 @property (nonatomic, strong) NSArray* rightButtons;
-@property (nonatomic) BOOL searching, inProduction, sucess;
+@property (nonatomic) BOOL searching, inProduction, sucess, pricing;
 @property (nonatomic) long userId;
 @property (nonatomic, strong)NSString *currentUrl;
+@property (nonatomic, strong)UIImageView *headerImageView;
 
 
 
@@ -129,6 +135,8 @@
 @property (nonatomic) NSURL* currentURL;
 @property (nonatomic) CGFloat titleOffset;
 
+
+-(void)gotHeaderImage:(NSURL*)imageUrl;
 - (void)close;
 - (void)reload;
 - (void)foundProductWithSavings:(float)savings andPoints:(int)points;

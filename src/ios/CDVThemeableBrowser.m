@@ -56,6 +56,7 @@
 
 #define    TOOLBAR_DEF_HEIGHT 30.0
 #define    LOCATIONBAR_HEIGHT 21.0
+#define    kFooterHeight 30.0
 #define    FOOTER_HEIGHT ((TOOLBAR_HEIGHT) + (LOCATIONBAR_HEIGHT))
 
 #pragma mark CDVThemeableBrowser
@@ -102,11 +103,38 @@
 -(void)foundProduct:(CDVInvokedUrlCommand*)command {
     NSLog(@"got thing: %@",[command.arguments objectAtIndex:0]);
     [self.themeableBrowserViewController foundProductWithSavings:[[command.arguments objectAtIndex:0] floatValue] andPoints:[[command.arguments objectAtIndex:1] intValue]];
+    self.themeableBrowserViewController.pricing = NO;
+    [self.themeableBrowserViewController.loadingView setAlpha:0];
+    self.themeableBrowserViewController.progress = 0;
+    [self.themeableBrowserViewController.savingsView setAlpha:1];
+    [self.themeableBrowserViewController.savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+//    self.themeableBrowserViewController.footerView
 }
-
+-(void)priceIt {
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                  messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
+//    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+    
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+}
+-(void)openProduct {
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                  messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
+    //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+    
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+}
 -(void)gotStatusCode:(CDVInvokedUrlCommand *)command {
     [self.themeableBrowserViewController gotStatusCode:[[command.arguments objectAtIndex:0] intValue]];
 }
+
+-(void)gotHeaderImage:(CDVInvokedUrlCommand*)command {
+    NSLog(@"got header image!");
+    NSLog(@"header image:%@",command.arguments.firstObject);
+    
+    [self.themeableBrowserViewController gotHeaderImage:[NSURL URLWithString:command.arguments.firstObject]];
+}
+
 - (void)close:(CDVInvokedUrlCommand*)command
 {
     if (self.themeableBrowserViewController == nil) {
@@ -523,6 +551,10 @@
         
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     }
+    
+    [_themeableBrowserViewController.priceItButton setAlpha:1.0f];
+    [_themeableBrowserViewController.loadingView setAlpha:0];
+    [_themeableBrowserViewController.savingsView setAlpha:0];
 }
 
 - (void)webView:(UIWebView*)theWebView didFailLoadWithError:(NSError*)error
@@ -732,6 +764,7 @@
     
     self.closeButton = [self createButton:_browserOptions.closeButton action:@selector(close) withDescription:@"close button"];
     self.backButton = [self createButton:_browserOptions.backButton action:@selector(goBack:) withDescription:@"back button"];
+    
     self.forwardButton = [self createButton:_browserOptions.forwardButton action:@selector(goForward:) withDescription:@"forward button"];
     self.menuButton = [self createButton:_browserOptions.menu action:@selector(goMenu:) withDescription:@"menu button"];
     
@@ -853,23 +886,119 @@
         [self.toolbar addSubview:self.titleButton];
     }
     
+    CGRect closeButtonFrame = self.closeButton.frame;
+    closeButtonFrame.origin.x+=10;
+    [self.closeButton setFrame:closeButtonFrame];
+    CGRect backButtonFrame = self.backButton.frame;
+    backButtonFrame.origin.x += 25;
+    [self.backButton setFrame:backButtonFrame];
+    
     self.view.backgroundColor = [CDVThemeableBrowserViewController colorFromRGBA:[self getStringFromDict:_browserOptions.statusbar withKey:kThemeableBrowserPropColor withDefault:@"#ffffffff"]];
     [self.view addSubview:self.toolbar];
     // [self.view addSubview:self.addressLabel];
     // [self.view addSubview:self.spinner];
     
-    UIView *footerView = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(self.view.frame)-60, CGRectGetWidth(self.view.frame), 60)];
-    [footerView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
-    _savingsLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), 40)];
-    [_savingsLabel setTextAlignment:NSTextAlignmentCenter];
+    _footerView = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(self.view.frame)-kFooterHeight, CGRectGetWidth(self.view.frame), kFooterHeight)];
+    [_footerView setBackgroundColor:[UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]];
+    _savingsView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), kFooterHeight)];
+    [_savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+    [_footerView addSubview:_savingsView];
+    
+    _savingsLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), kFooterHeight-5)];
+    [_savingsLabel setTextAlignment:NSTextAlignmentLeft];
     [self.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
     [_savingsLabel setTextColor:[UIColor whiteColor]];
     [_savingsLabel setText:@"Loading..."];
-    [footerView addSubview:_savingsLabel];
-    //        [theWebView addSubview:footerView];
-//    [_savingsLabel setCenter:footerView.center];
-    [self.view addSubview:footerView];
+    [_savingsView addSubview:_savingsLabel];
+
+    _detailButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_detailButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-100, 3,70, kFooterHeight-3)];
+    [_detailButton setTitle:@"DETAILS" forState:UIControlStateNormal];
+    [_detailButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:12]];
+    [_detailButton.titleLabel setTextColor:[UIColor whiteColor]];
+    [_savingsView addSubview:_detailButton];
+    
+    _arrowButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_arrowButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-30, 3,30, kFooterHeight-3)];
+    [_arrowButton setTitle:@"^" forState:UIControlStateNormal];
+    [_arrowButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
+    [_arrowButton.titleLabel setTextColor:[UIColor whiteColor]];
+    [_savingsView addSubview:_arrowButton];
+    
+    _priceItButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_priceItButton setImage:[UIImage imageNamed:@"ic_price_it"] forState:UIControlStateNormal];
+//    [_priceItButton setFrame:CGRectMake(0, 0, 120, kFooterHeight)];
+    [_footerView addSubview:_priceItButton];
+    [_priceItButton setFrame:CGRectMake(0, 5, CGRectGetWidth(self.view.frame), 20)];
+    [_priceItButton.imageView setContentMode:UIViewContentModeScaleAspectFit];
+    [_priceItButton.imageView setAutoresizingMask:(UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin)];
+
+    [_priceItButton addTarget:self action:@selector(priceIt) forControlEvents:UIControlEventTouchUpInside];
+//    [_priceItButton setAlpha:0];
+    [self setupPricingView];
+    [_footerView addSubview:_loadingView];
+    
+    //            [theWebView addSubview:_footerView];
+    //    [_savingsLabel setCenter:_footerView.center];
+    [self.view addSubview:_footerView];
 }
+
+-(void)gotHeaderImage:(NSURL*)imageUrl {
+    NSLog(@"got header image:%@",imageUrl.absoluteString);
+    UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:imageUrl]];
+    if(!_headerImageView) {
+        _headerImageView = [[UIImageView alloc] initWithImage:image];
+        [self.toolbar addSubview:_headerImageView];
+        [_headerImageView setFrame:CGRectMake(0, 5, CGRectGetWidth(self.view.frame), 23)];
+        [_headerImageView setContentMode:UIViewContentModeScaleAspectFit];
+        [_headerImageView setAutoresizingMask:(UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin)];
+        
+    } else {
+        [_headerImageView setImage:image];
+    }
+}
+-(void)priceIt {
+    NSLog(@"tried to price!");
+    if(!_pricing) {
+        _pricing = YES;
+        NSLog(@"pricing it!");
+        [self.navigationDelegate priceIt];
+        [self.priceItButton setAlpha:0];
+        [self.loadingView setAlpha:1];
+        _progress = 0;
+        [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(incrementProgress) userInfo:NULL repeats:YES];
+    }
+//    self.webView stringByEvaluatingJavaScript'FromString:[NSString stringWithFormat:@"%@(%@);"];
+}
+
+-(void)setupPricingView {
+    _loadingView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), kFooterHeight)];
+    _progressBar = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleBar];
+    [_progressBar setFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), 5)];
+    [_progressBar setProgressTintColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+    [_loadingView setBackgroundColor:[UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]];
+    _loadingLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 8, CGRectGetWidth(self.view.frame), kFooterHeight-10)];
+    [_loadingLabel setText:@"PRICING RIGHT NOW"];
+    [_loadingLabel setTextColor:[UIColor colorWithRed:0.47 green:0.47 blue:0.47 alpha:1.0]];
+    [_loadingLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:14]];
+    [_loadingLabel setTextAlignment:NSTextAlignmentCenter];
+    [_loadingView addSubview:_loadingLabel];
+    [_loadingView addSubview:_progressBar];
+    
+    
+    [_loadingView setAlpha:0];
+    _progress = 0;
+}
+
+
+-(void)incrementProgress {
+    if(_progress < 1) {
+        _progress += .03 ;
+        [_progressBar setProgress:_progress animated:YES];
+    }
+}
+
+
 
 /**
  * This is a rather unintuitive helper method to load images. The reason why this method exists
@@ -1416,8 +1545,8 @@
 
 - (void)foundProductWithSavings:(float)savings andPoints:(int)points {
     if(savings)
-        [_savingsLabel setText:[NSString stringWithFormat:@"Savings: $%.02f",savings]];
-    else [_savingsLabel setText:[NSString stringWithFormat:@"Points: %i",points]];
+        [_savingsLabel setText:[NSString stringWithFormat:@"SAVE $%.02f",savings]];
+    else [_savingsLabel setText:[NSString stringWithFormat:@"Earn %i Price Points",points]];
     
 }
 
@@ -1428,8 +1557,11 @@
 
 - (void)webViewDidStartLoad:(UIWebView*)theWebView
 {
-    if(!_searching)
-        [_savingsLabel setText:@"Loading..."];
+    if(!_searching) {
+        [_loadingView setAlpha:1];
+        [_loadingLabel setText:@"Loading..."];
+        
+    }
     
     
     // loading url, start spinner
