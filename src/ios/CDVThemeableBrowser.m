@@ -110,6 +110,9 @@
     [self.themeableBrowserViewController.savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
 //    self.themeableBrowserViewController.footerView
 }
+-(void)showPriceIt:(CDVInvokedUrlCommand*)command {
+    [_themeableBrowserViewController showPriceIt:[[command.arguments objectAtIndex:0] boolValue]];
+}
 -(void)priceIt {
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                   messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
@@ -117,13 +120,16 @@
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
 }
+
 -(void)openProduct {
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                  messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
+                                                  messageAsDictionary:@{@"type":@"openpdp"}];
     //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+    
 }
+
 -(void)gotStatusCode:(CDVInvokedUrlCommand *)command {
     [self.themeableBrowserViewController gotStatusCode:[[command.arguments objectAtIndex:0] intValue]];
 }
@@ -897,7 +903,20 @@
     [self.view addSubview:self.toolbar];
     // [self.view addSubview:self.addressLabel];
     // [self.view addSubview:self.spinner];
+    [self createFooterView];
+    if(!_browserOptions.showPriceIt)
+        _footerView.hidden = true;
     
+    if(_browserOptions.logoUrl) {
+        [self setHeaderImage:[UIImage imageWithData:[NSData dataWithContentsOfURL:[NSURL URLWithString:_browserOptions.logoUrl]]]];
+    }
+    
+    //            [theWebView addSubview:_footerView];
+    //    [_savingsLabel setCenter:_footerView.center];
+    [self.view addSubview:_footerView];
+}
+
+-(void)createFooterView {
     _footerView = [[UIView alloc] initWithFrame:CGRectMake(0, CGRectGetMaxY(self.view.frame)-kFooterHeight, CGRectGetWidth(self.view.frame), kFooterHeight)];
     [_footerView setBackgroundColor:[UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]];
     _savingsView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), kFooterHeight)];
@@ -910,7 +929,7 @@
     [_savingsLabel setTextColor:[UIColor whiteColor]];
     [_savingsLabel setText:@"Loading..."];
     [_savingsView addSubview:_savingsLabel];
-
+    
     _detailButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [_detailButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-100, 3,70, kFooterHeight-3)];
     [_detailButton setTitle:@"DETAILS" forState:UIControlStateNormal];
@@ -927,25 +946,30 @@
     
     _priceItButton = [UIButton buttonWithType:UIButtonTypeCustom];
     [_priceItButton setImage:[UIImage imageNamed:@"ic_price_it"] forState:UIControlStateNormal];
-//    [_priceItButton setFrame:CGRectMake(0, 0, 120, kFooterHeight)];
+    //    [_priceItButton setFrame:CGRectMake(0, 0, 120, kFooterHeight)];
     [_footerView addSubview:_priceItButton];
     [_priceItButton setFrame:CGRectMake(0, 5, CGRectGetWidth(self.view.frame), 20)];
     [_priceItButton.imageView setContentMode:UIViewContentModeScaleAspectFit];
     [_priceItButton.imageView setAutoresizingMask:(UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin)];
-
+    
     [_priceItButton addTarget:self action:@selector(priceIt) forControlEvents:UIControlEventTouchUpInside];
-//    [_priceItButton setAlpha:0];
+    //    [_priceItButton setAlpha:0];
     [self setupPricingView];
     [_footerView addSubview:_loadingView];
-    
-    //            [theWebView addSubview:_footerView];
-    //    [_savingsLabel setCenter:_footerView.center];
-    [self.view addSubview:_footerView];
+
+}
+-(void)showPriceIt:(BOOL)show {
+    _browserOptions.showPriceIt = show;
+    _footerView.hidden = !show;
 }
 
 -(void)gotHeaderImage:(NSURL*)imageUrl {
     NSLog(@"got header image:%@",imageUrl.absoluteString);
     UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:imageUrl]];
+    [self setHeaderImage:image];
+}
+
+-(void)setHeaderImage:(UIImage*)image {
     if(!_headerImageView) {
         _headerImageView = [[UIImageView alloc] initWithImage:image];
         [self.toolbar addSubview:_headerImageView];
@@ -957,6 +981,7 @@
         [_headerImageView setImage:image];
     }
 }
+
 -(void)priceIt {
     NSLog(@"tried to price!");
     if(!_pricing) {

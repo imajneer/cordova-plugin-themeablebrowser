@@ -60,6 +60,8 @@
 @property (nonatomic) BOOL backButtonCanClose;
 @property (nonatomic) BOOL disableAnimation;
 @property (nonatomic) BOOL fullscreen;
+@property (nonatomic) NSString *logoUrl;
+@property (nonatomic) BOOL showPriceIt;
 
 @end
 
@@ -94,8 +96,6 @@
     NSString* _prevUserAgent;
     NSInteger _userAgentLockToken;
     UIStatusBarStyle _statusBarStyle;
-    CDVThemeableBrowserOptions *_browserOptions;
-    
     
 #ifdef __CORDOVA_4_0_0
     CDVUIWebViewDelegate* _webViewDelegate;
@@ -127,6 +127,7 @@
 @property (nonatomic) long userId;
 @property (nonatomic, strong)NSString *currentUrl;
 @property (nonatomic, strong)UIImageView *headerImageView;
+@property (nonatomic)CDVThemeableBrowserOptions *browserOptions;
 
 
 
@@ -137,6 +138,7 @@
 
 
 -(void)gotHeaderImage:(NSURL*)imageUrl;
+-(void)showPriceIt:(BOOL)show;
 - (void)close;
 - (void)reload;
 - (void)foundProductWithSavings:(float)savings andPoints:(int)points;
