@@ -1727,10 +1727,16 @@ private boolean stringsValidator(String... inputs) {
             Log.e(LOG_TAG, "URI passed in has caused a JSON error.");
           }
 
-          if(showFooterBars){
+          /*if(showFooterBars){
             //Add loading view in footer area
             main.addView(getLoadingView());
-          }
+          }*/
+
+          if(showFooterBars){
+                //Add Price it view in Footer area
+              main.addView(getPriceItView(url));
+            }
+            
         }
 
         public void onPageFinished(WebView view, String url) {
@@ -1748,10 +1754,10 @@ private boolean stringsValidator(String... inputs) {
                                            view.canGoForward());
             }
 
-            if(showFooterBars){
+            /*if(showFooterBars){
                 //Add Price it view in Footer area
               main.addView(getPriceItView(url));
-            }
+            }*/
 
           } catch (JSONException ex) {
           }
