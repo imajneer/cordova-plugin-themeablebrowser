@@ -63,6 +63,7 @@
 @property (nonatomic) NSString *logoUrl;
 @property (nonatomic) BOOL showPriceIt;
 
+
 @end
 
 @class CDVThemeableBrowserViewController;
@@ -74,6 +75,7 @@
 @property (nonatomic, retain) CDVThemeableBrowserViewController* themeableBrowserViewController;
 @property (nonatomic, copy) NSString* callbackId;
 @property (nonatomic, copy) NSRegularExpression *callbackIdPattern;
+@property (nonatomic) BOOL openedPdp;
 
 - (CDVThemeableBrowserOptions*)parseOptions:(NSString*)options;
 - (void)open:(CDVInvokedUrlCommand*)command;

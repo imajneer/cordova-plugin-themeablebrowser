@@ -89,7 +89,7 @@
     if (self != nil) {
         _isShown = NO;
         _callbackIdPattern = nil;
-        
+        _openedPdp = NO;
     }
     
     return self;
@@ -127,11 +127,15 @@
     //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
-    
+    _openedPdp = YES;
 }
 
 -(void)gotStatusCode:(CDVInvokedUrlCommand *)command {
     [self.themeableBrowserViewController gotStatusCode:[[command.arguments objectAtIndex:0] intValue]];
+}
+
+-(void)openUrlInBrowser:(CDVInvokedUrlCommand *)command {
+    [self.webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:command.arguments.firstObject]]];
 }
 
 -(void)gotHeaderImage:(CDVInvokedUrlCommand*)command {
@@ -500,11 +504,22 @@
 {
     NSLog(@"just loaded webview with request: %@",request.URL.absoluteString);
     NSLog(@"just loaded webview with navigation type: %l",navigationType);
+    
     NSURL* url = request.URL;
     BOOL isTopLevelNavigation = [request.URL isEqual:[request mainDocumentURL]];
     
     // See if the url uses the 'gap-iab' protocol. If so, the host should be the id of a callback to execute,
     // and the path, if present, should be a JSON-encoded value to pass to the callback.
+    if(navigationType == UIWebViewNavigationTypeLinkClicked) {
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsDictionary:@{@"type":@"linkclicked", @"url":request.URL.absoluteString}];
+        //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+        
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+        
+        [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(showPriceItButton) userInfo:NULL repeats:NO];
+    }
+    
     if ([[url scheme] isEqualToString:@"gap-iab"]) {
         NSString* scriptCallbackId = [url host];
         CDVPluginResult* pluginResult = nil;
@@ -539,6 +554,11 @@
     
     return YES;
 }
+-(void)showPriceItButton {
+    [_themeableBrowserViewController.priceItButton setAlpha:1.0f];
+    [_themeableBrowserViewController.loadingView setAlpha:0];
+    [_themeableBrowserViewController.savingsView setAlpha:0];
+}
 
 - (void)webViewDidStartLoad:(UIWebView*)theWebView
 {
@@ -558,9 +578,7 @@
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     }
     
-    [_themeableBrowserViewController.priceItButton setAlpha:1.0f];
-    [_themeableBrowserViewController.loadingView setAlpha:0];
-    [_themeableBrowserViewController.savingsView setAlpha:0];
+    [self showPriceItButton];
 }
 
 - (void)webView:(UIWebView*)theWebView didFailLoadWithError:(NSError*)error
@@ -1350,11 +1368,13 @@
 {
     [self emitEventForButton:_browserOptions.backButton];
     
-    if (self.webView.canGoBack) {
-        [self.webView goBack];
-        [self updateButtonDelayed:self.webView];
-    } else if (_browserOptions.backButtonCanClose) {
-        [self close];
+    if(!self.navigationDelegate.openedPdp) {
+        if (self.webView.canGoBack) {
+            [self.webView goBack];
+            [self updateButtonDelayed:self.webView];
+        } else if (_browserOptions.backButtonCanClose) {
+            [self close];
+        }
     }
 }
 
