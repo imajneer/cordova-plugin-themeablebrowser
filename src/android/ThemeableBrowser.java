@@ -143,7 +143,7 @@
     private com.nostra13.universalimageloader.core.ImageLoader imageLoader;
     private DisplayImageOptions imageLoadingOptions;
     private String storeLogo = null;
-    private boolean showFooterBars = false;
+    private boolean showPriceIt = false;
 
     public boolean execute(String action, final CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
       ctx = this.cordova.getActivity();
@@ -160,7 +160,7 @@
         final String target = t;
         final Options features = parseFeature(args.optString(2));
         storeLogo = features.logoUrl;
-        showFooterBars = features.showFooterBars;
+        showPriceIt = features.showPriceIt;
 
         this.cordova.getActivity().runOnUiThread(new Runnable() {
           @Override
@@ -1727,12 +1727,12 @@ private boolean stringsValidator(String... inputs) {
             Log.e(LOG_TAG, "URI passed in has caused a JSON error.");
           }
 
-          /*if(showFooterBars){
+          /*if(showPriceIt){
             //Add loading view in footer area
             main.addView(getLoadingView());
           }*/
 
-          if(showFooterBars){
+          if(showPriceIt){
                 //Add Price it view in Footer area
               main.addView(getPriceItView(url));
             }
@@ -1754,7 +1754,7 @@ private boolean stringsValidator(String... inputs) {
                                            view.canGoForward());
             }
 
-            /*if(showFooterBars){
+            /*if(showPriceIt){
                 //Add Price it view in Footer area
               main.addView(getPriceItView(url));
             }*/
@@ -1846,7 +1846,7 @@ private boolean stringsValidator(String... inputs) {
       public boolean disableAnimation;
       public boolean fullscreen;
       public String logoUrl;
-      public boolean showFooterBars;
+      public boolean showPriceIt;
     }
 
     private static class Event {
