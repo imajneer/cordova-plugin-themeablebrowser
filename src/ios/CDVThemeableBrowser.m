@@ -129,17 +129,19 @@
     } return _userId;
 }
 -(void)priceIt {
-    NSLog(@"should br pricine it!!!");
+    NSString *urlString = self.themeableBrowserViewController.webView.request.URL.absoluteString;
+    NSLog(@"should br pricine url: %@",urlString);
+    NSLog(@"got current url: %@",self.themeableBrowserViewController.currentUrl);
     
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                  messageAsDictionary:@{@"type":@"linkclicked", @"url":self.webView.request.URL.absoluteString}];
-    //            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
-    
+                                                  messageAsDictionary:@{@"type":@"priceit", @"url":urlString}];
+    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+//    self.themeableBrowserViewController.currentUrl = request.URL.absoluteString;
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
-
-//    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
-//    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
     
+//    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{@"type":@"priceit", @"url":urlString}];
+//    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+//
 //    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
 }
 
@@ -147,18 +149,21 @@
     NSLog(@"should open product!");
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                   messageAsDictionary:@{@"type":@"openpdp"}];
-    //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+        [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     _openedPdp = YES;
 }
 
 -(void)gotStatusCode:(CDVInvokedUrlCommand *)command {
+    NSLog(@"got status code!");
     [self.themeableBrowserViewController gotStatusCode:[[command.arguments objectAtIndex:0] intValue]];
 }
 
--(void)openUrlInBrowser:(CDVInvokedUrlCommand *)command {
-    [self.webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:command.arguments.firstObject]]];
+-(void)openUrl:(CDVInvokedUrlCommand *)command {
+    NSString *urlString = command.arguments.firstObject;
+    NSLog(@"should open url: %@",urlString);
+    [self.themeableBrowserViewController.webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:urlString]]];
 }
 
 -(void)gotHeaderImage:(CDVInvokedUrlCommand*)command {
@@ -536,7 +541,7 @@
     if(navigationType == UIWebViewNavigationTypeLinkClicked) {
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                       messageAsDictionary:@{@"type":@"linkclicked", @"url":request.URL.absoluteString}];
-//            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
         self.themeableBrowserViewController.currentUrl = request.URL.absoluteString;
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
         self.themeableBrowserViewController.pricing = NO;
@@ -1032,39 +1037,38 @@
 
 -(void)priceIt {
     NSLog(@"tried to price!");
-    if(!_pricing) {
-        _pricing = YES;
-        NSLog(@"pricing it!");
-//        [self.navigationDelegate priceIt];
-        [self.priceItButton setAlpha:0];
-        [self.loadingView setAlpha:1];
-        _progress = 0;
-        [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(incrementProgress) userInfo:NULL repeats:YES];
-        
-        NSURL *url = [self reqUrl];
-        NSLog(@"sending url: %@",url.absoluteString);
-        NSURLRequest *request = [NSURLRequest requestWithURL:url];
-        [NSURLConnection sendAsynchronousRequest:request
-                                           queue:[NSOperationQueue mainQueue]
-                               completionHandler:^(NSURLResponse *response,
-                                                   NSData *data, NSError *connectionError)
-         {
-             if (data.length > 0 && connectionError == nil)
-             {
-                 NSDictionary *greeting = [NSJSONSerialization JSONObjectWithData:data
-                                                                          options:0
-                                                                            error:NULL];
-                 NSString *requestId = [greeting objectForKey:@"request_id"];
-                 NSLog(@"got request: %@",requestId);
-                 
-//                 self.greetingId.text = [[greeting objectForKey:@"id"] stringValue];
-//                 self.greetingContent.text = [greeting objectForKey:@"content"];
-                 
-             }
-         }];
+    if(_pricing) return;
+    
+    _pricing = YES;
+    NSLog(@"pricing it!");
+    [self.navigationDelegate priceIt];
+    [self.priceItButton setAlpha:0];
+    [self.loadingView setAlpha:1];
+    _progress = 0;
+    [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(incrementProgress) userInfo:NULL repeats:YES];
+    
+//        NSURL *url = [self reqUrl];
+//        NSLog(@"sending url: %@",url.absoluteString);
+//        NSURLRequest *request = [NSURLRequest requestWithURL:url];
+//        [NSURLConnection sendAsynchronousRequest:request
+//                                           queue:[NSOperationQueue mainQueue]
+//                               completionHandler:^(NSURLResponse *response,
+//                                                   NSData *data, NSError *connectionError)
+//         {
+//             if (data.length > 0 && connectionError == nil)
+//             {
+//                 NSDictionary *greeting = [NSJSONSerialization JSONObjectWithData:data
+//                                                                          options:0
+//                                                                            error:NULL];
+//                 NSString *requestId = [greeting objectForKey:@"request_id"];
+//                 NSLog(@"got request: %@",requestId);
+//                 
+////                 self.greetingId.text = [[greeting objectForKey:@"id"] stringValue];
+////                 self.greetingContent.text = [greeting objectForKey:@"content"];
+//                 
+//             }
+//         }];
 
-    }
-//    self.webView stringByEvaluatingJavaScript'FromString:[NSString stringWithFormat:@"%@(%@);"];
 }
 
 -(void)setupPricingView {
@@ -1419,9 +1423,10 @@
 
 - (void)goBack:(id)sender
 {
+    NSLog(@"tried to go back!");
     [self emitEventForButton:_browserOptions.backButton];
     
-    if(!self.navigationDelegate.openedPdp) {
+    if(!self.navigationDelegate.openedPdp && !_browserOptions.openedFromPdp) {
         if (self.webView.canGoBack) {
             [self.webView goBack];
             [self updateButtonDelayed:self.webView];
@@ -1736,7 +1741,7 @@
 - (void)updateButton:(UIWebView*)theWebView
 {
     if (self.backButton) {
-        self.backButton.enabled = _browserOptions.backButtonCanClose || theWebView.canGoBack;
+//        self.backButton.enabled = _browserOptions.backButtonCanClose || theWebView.canGoBack;
     }
     
     if (self.forwardButton) {

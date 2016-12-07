@@ -61,7 +61,7 @@
 @property (nonatomic) BOOL disableAnimation;
 @property (nonatomic) BOOL fullscreen;
 @property (nonatomic) NSString *logoUrl;
-@property (nonatomic) BOOL showPriceIt;
+@property (nonatomic) BOOL showPriceIt, openedFromPdp;
 
 
 @end
