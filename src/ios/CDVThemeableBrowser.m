@@ -101,27 +101,50 @@
     [self close:nil];
 }
 -(void)foundProduct:(CDVInvokedUrlCommand*)command {
-    NSLog(@"got thing: %@",[command.arguments objectAtIndex:0]);
-    [self.themeableBrowserViewController foundProductWithSavings:[[command.arguments objectAtIndex:0] floatValue] andPoints:[[command.arguments objectAtIndex:1] intValue]];
-    self.themeableBrowserViewController.pricing = NO;
-    [self.themeableBrowserViewController.loadingView setAlpha:0];
-    self.themeableBrowserViewController.progress = 0;
-    [self.themeableBrowserViewController.savingsView setAlpha:1];
-    [self.themeableBrowserViewController.savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+//    if([[command.arguments objectAtIndex:3] isEqualToString:self.webView.request.URL.absoluteString]) {
+    for(id argument in command.arguments) {
+        NSLog(@"argument: %@",NSStringFromClass([argument class]));
+    }
+    
+    [self.themeableBrowserViewController foundProductWithSavings:[[command argumentAtIndex:0] floatValue] andPoints:[[command argumentAtIndex: 1] intValue]];
+        self.themeableBrowserViewController.pricing = NO;
+        [self.themeableBrowserViewController.loadingView setAlpha:0];
+        self.themeableBrowserViewController.progress = 0;
+        [self.themeableBrowserViewController.savingsView setAlpha:1];
+        [self.themeableBrowserViewController.savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
 //    self.themeableBrowserViewController.footerView
+//    }
 }
+
 -(void)showPriceIt:(CDVInvokedUrlCommand*)command {
     [_themeableBrowserViewController showPriceIt:[[command.arguments objectAtIndex:0] boolValue]];
 }
+
+-(long)userId {
+    if(!_userId) {
+        NSUserDefaults *myDefaults = [[NSUserDefaults standardUserDefaults]
+                                      initWithSuiteName:@"group.price.app"];
+        
+        _userId = (int)[myDefaults integerForKey:@"user_id"];
+    } return _userId;
+}
 -(void)priceIt {
+    NSLog(@"should br pricine it!!!");
+    
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                  messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
-//    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+                                                  messageAsDictionary:@{@"type":@"linkclicked", @"url":self.webView.request.URL.absoluteString}];
+    //            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+
+//    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:@{@"type":@"priceit", @"url":self.webView.request.URL.absoluteString}];
+//    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+    
+//    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
 }
 
 -(void)openProduct {
+    NSLog(@"should open product!");
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                   messageAsDictionary:@{@"type":@"openpdp"}];
     //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
@@ -513,9 +536,10 @@
     if(navigationType == UIWebViewNavigationTypeLinkClicked) {
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                       messageAsDictionary:@{@"type":@"linkclicked", @"url":request.URL.absoluteString}];
-        //    [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
-        
+//            [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+        self.themeableBrowserViewController.currentUrl = request.URL.absoluteString;
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+        self.themeableBrowserViewController.pricing = NO;
         
         [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(showPriceItButton) userInfo:NULL repeats:NO];
     }
@@ -953,6 +977,7 @@
     [_detailButton setTitle:@"DETAILS" forState:UIControlStateNormal];
     [_detailButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:12]];
     [_detailButton.titleLabel setTextColor:[UIColor whiteColor]];
+    [_detailButton addTarget:self action:@selector(tappedDetailButton) forControlEvents:UIControlEventTouchUpInside];
     [_savingsView addSubview:_detailButton];
     
     _arrowButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -960,6 +985,7 @@
     [_arrowButton setTitle:@"^" forState:UIControlStateNormal];
     [_arrowButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
     [_arrowButton.titleLabel setTextColor:[UIColor whiteColor]];
+    [_arrowButton addTarget:self action:@selector(tappedDetailButton) forControlEvents:UIControlEventTouchUpInside];
     [_savingsView addSubview:_arrowButton];
     
     _priceItButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -975,6 +1001,10 @@
     [self setupPricingView];
     [_footerView addSubview:_loadingView];
 
+}
+
+-(void)tappedDetailButton {
+    [self.navigationDelegate openProduct];
 }
 -(void)showPriceIt:(BOOL)show {
     _browserOptions.showPriceIt = show;
@@ -1005,11 +1035,34 @@
     if(!_pricing) {
         _pricing = YES;
         NSLog(@"pricing it!");
-        [self.navigationDelegate priceIt];
+//        [self.navigationDelegate priceIt];
         [self.priceItButton setAlpha:0];
         [self.loadingView setAlpha:1];
         _progress = 0;
         [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(incrementProgress) userInfo:NULL repeats:YES];
+        
+        NSURL *url = [self reqUrl];
+        NSLog(@"sending url: %@",url.absoluteString);
+        NSURLRequest *request = [NSURLRequest requestWithURL:url];
+        [NSURLConnection sendAsynchronousRequest:request
+                                           queue:[NSOperationQueue mainQueue]
+                               completionHandler:^(NSURLResponse *response,
+                                                   NSData *data, NSError *connectionError)
+         {
+             if (data.length > 0 && connectionError == nil)
+             {
+                 NSDictionary *greeting = [NSJSONSerialization JSONObjectWithData:data
+                                                                          options:0
+                                                                            error:NULL];
+                 NSString *requestId = [greeting objectForKey:@"request_id"];
+                 NSLog(@"got request: %@",requestId);
+                 
+//                 self.greetingId.text = [[greeting objectForKey:@"id"] stringValue];
+//                 self.greetingContent.text = [greeting objectForKey:@"content"];
+                 
+             }
+         }];
+
     }
 //    self.webView stringByEvaluatingJavaScript'FromString:[NSString stringWithFormat:@"%@(%@);"];
 }
@@ -1569,7 +1622,7 @@
 }
 
 -(NSURL*)reqUrl {
-    return [NSURL URLWithString:[NSString stringWithFormat:@"%@/v2/priceit?user_id=%ld&url=%@&source=app",self.hostUrl,_userId,_currentUrl]];
+    return [NSURL URLWithString:[NSString stringWithFormat:@"%@/v2/priceit?user_id=%ld&url=%@&source=app",self.hostUrl,self.navigationDelegate.userId,self.currentUrl]];
 }
 
 
@@ -1602,11 +1655,11 @@
 
 - (void)webViewDidStartLoad:(UIWebView*)theWebView
 {
-    if(!_searching) {
-        [_loadingView setAlpha:1];
-        [_loadingLabel setText:@"Loading..."];
-        
-    }
+//    if(!_searching) {
+//        [_loadingView setAlpha:1];
+//        [_loadingLabel setText:@"Loading..."];
+//        
+//    }
     
     
     // loading url, start spinner

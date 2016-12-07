@@ -76,11 +76,14 @@
 @property (nonatomic, copy) NSString* callbackId;
 @property (nonatomic, copy) NSRegularExpression *callbackIdPattern;
 @property (nonatomic) BOOL openedPdp;
+@property (nonatomic) long userId;
+
 
 - (CDVThemeableBrowserOptions*)parseOptions:(NSString*)options;
 - (void)open:(CDVInvokedUrlCommand*)command;
 - (void)close:(CDVInvokedUrlCommand*)command;
 - (void)foundProduct:(CDVInvokedUrlCommand*)command;
+-(void)openProduct;
 - (void)priceIt;
 - (void)injectScriptCode:(CDVInvokedUrlCommand*)command;
 - (void)show:(CDVInvokedUrlCommand*)command;
@@ -126,7 +129,6 @@
 @property (nonatomic, strong) NSArray* leftButtons;
 @property (nonatomic, strong) NSArray* rightButtons;
 @property (nonatomic) BOOL searching, inProduction, sucess, pricing;
-@property (nonatomic) long userId;
 @property (nonatomic, strong)NSString *currentUrl;
 @property (nonatomic, strong)UIImageView *headerImageView;
 @property (nonatomic)CDVThemeableBrowserOptions *browserOptions;
