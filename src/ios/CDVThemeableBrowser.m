@@ -102,7 +102,8 @@
 }
 
 -(void)foundProduct:(CDVInvokedUrlCommand*)command {
-//    if([[command.arguments objectAtIndex:3] isEqualToString:self.webView.request.URL.absoluteString]) {
+    NSString *themeString = self.themeableBrowserViewController.webView.request.URL.absoluteString;
+    
     NSLog(@"found product!");
     for(id argument in command.arguments) {
         NSLog(@"argument: %@",NSStringFromClass([argument class]));
@@ -115,7 +116,6 @@
         [self.themeableBrowserViewController.savingsView setAlpha:1];
         [self.themeableBrowserViewController.savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
 //    self.themeableBrowserViewController.footerView
-//    }
 }
 
 -(void)showPriceIt:(CDVInvokedUrlCommand*)command {
@@ -136,7 +136,7 @@
     NSLog(@"got current url: %@",self.themeableBrowserViewController.currentUrl);
     
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                  messageAsDictionary:@{@"type":@"priceit", @"url":urlString}];
+                                                  messageAsDictionary:@{@"type":@"priceit", @"url":self.themeableBrowserViewController.webView.request.URL.absoluteString}];
     [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
 //    self.themeableBrowserViewController.currentUrl = request.URL.absoluteString;
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
