@@ -63,7 +63,7 @@
 
 
 
-@interface CDVThemeableBrowser () {
+@interface CDVThemeableBrowser () <UIGestureRecognizerDelegate> {
     BOOL _isShown;
 }
 @end
@@ -90,8 +90,8 @@
         _isShown = NO;
         _callbackIdPattern = nil;
         _openedPdp = NO;
+        _taps = 0;
     }
-    
     return self;
 }
 #endif
@@ -100,8 +100,10 @@
 {
     [self close:nil];
 }
+
 -(void)foundProduct:(CDVInvokedUrlCommand*)command {
 //    if([[command.arguments objectAtIndex:3] isEqualToString:self.webView.request.URL.absoluteString]) {
+    NSLog(@"found product!");
     for(id argument in command.arguments) {
         NSLog(@"argument: %@",NSStringFromClass([argument class]));
     }
@@ -164,6 +166,8 @@
     NSString *urlString = command.arguments.firstObject;
     NSLog(@"should open url: %@",urlString);
     [self.themeableBrowserViewController.webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:urlString]]];
+    self.themeableBrowserViewController.currentUrl = urlString;
+    [NSTimer scheduledTimerWithTimeInterval:.5 target:self selector:@selector(showPriceItButton) userInfo:NULL repeats:NO];
 }
 
 -(void)gotHeaderImage:(CDVInvokedUrlCommand*)command {
@@ -324,6 +328,13 @@
     if (browserOptions.closebuttoncaption != nil) {
         // [self.themeableBrowserViewController setCloseButtonTitle:browserOptions.closebuttoncaption];
     }
+    
+    UITapGestureRecognizer *webViewTapped = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(tapAction:)];
+    webViewTapped.numberOfTapsRequired = 1;
+    webViewTapped.delegate = self;
+    [self.themeableBrowserViewController.webView addGestureRecognizer:webViewTapped];
+    
+    
     // Set Presentation Style
     UIModalPresentationStyle presentationStyle = UIModalPresentationFullScreen; // default
     if (browserOptions.presentationstyle != nil) {
@@ -372,6 +383,18 @@
     if (!browserOptions.hidden) {
         [self show:nil withAnimation:!browserOptions.disableAnimation];
     }
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+{
+    return YES;
+}
+
+- (void)tapAction:(UITapGestureRecognizer *)sender
+{
+    NSLog(@"touched link!!!!!!!!!!!!!!!!!!!");
+    _taps = 1;
+    // Get the specific point that was touched
 }
 
 - (void)show:(CDVInvokedUrlCommand*)command
@@ -530,6 +553,7 @@
  */
 - (BOOL)webView:(UIWebView*)theWebView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
 {
+//    if(theWebView )
     NSLog(@"just loaded webview with request: %@",request.URL.absoluteString);
     NSLog(@"just loaded webview with navigation type: %l",navigationType);
     
@@ -538,7 +562,8 @@
     
     // See if the url uses the 'gap-iab' protocol. If so, the host should be the id of a callback to execute,
     // and the path, if present, should be a JSON-encoded value to pass to the callback.
-    if(navigationType == UIWebViewNavigationTypeLinkClicked) {
+    if(navigationType == UIWebViewNavigationTypeLinkClicked && _taps) {
+        _taps = 0;
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
                                                       messageAsDictionary:@{@"type":@"linkclicked", @"url":request.URL.absoluteString}];
             [pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];

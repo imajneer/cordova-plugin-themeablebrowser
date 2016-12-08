@@ -70,6 +70,7 @@
 
 @interface CDVThemeableBrowser : CDVInAppBrowser {
     BOOL _injectedIframeBridge;
+    int _taps;
 }
 
 @property (nonatomic, retain) CDVThemeableBrowserViewController* themeableBrowserViewController;
