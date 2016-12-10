@@ -110,11 +110,7 @@
     }
     
     [self.themeableBrowserViewController foundProductWithSavings:[[command argumentAtIndex:0] floatValue] andPoints:[[command argumentAtIndex: 1] intValue]];
-        self.themeableBrowserViewController.pricing = NO;
-        [self.themeableBrowserViewController.loadingView setAlpha:0];
-        self.themeableBrowserViewController.progress = 0;
-        [self.themeableBrowserViewController.savingsView setAlpha:1];
-        [self.themeableBrowserViewController.savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+    
 //    self.themeableBrowserViewController.footerView
 }
 
@@ -570,7 +566,8 @@
         self.themeableBrowserViewController.currentUrl = request.URL.absoluteString;
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
         self.themeableBrowserViewController.pricing = NO;
-        
+        [self.themeableBrowserViewController.loadingView setAlpha:0];
+        [self.themeableBrowserViewController.loadingLabel setText:@"PRICING RIGHT NOW"];
         [NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(showPriceItButton) userInfo:NULL repeats:NO];
     }
     
@@ -632,7 +629,6 @@
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     }
     
-    [self showPriceItButton];
 }
 
 - (void)webView:(UIWebView*)theWebView didFailLoadWithError:(NSError*)error
@@ -986,6 +982,12 @@
     //            [theWebView addSubview:_footerView];
     //    [_savingsLabel setCenter:_footerView.center];
     [self.view addSubview:_footerView];
+    
+    if(_browserOptions.percentage_saved || _browserOptions.price_points) {
+        [self foundProductWithSavings:_browserOptions.percentage_saved andPoints:_browserOptions.price_points];
+        [_loadingView setAlpha:0];
+        [_priceItButton setAlpha:0];
+    }
 }
 
 -(void)createFooterView {
@@ -995,26 +997,29 @@
     [_savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
     [_footerView addSubview:_savingsView];
     
-    _savingsLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), kFooterHeight-5)];
+    _savingsLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 2, CGRectGetWidth(self.view.frame), kFooterHeight-5)];
     [_savingsLabel setTextAlignment:NSTextAlignmentLeft];
-    [self.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
+//    [self.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
     [_savingsLabel setTextColor:[UIColor whiteColor]];
     [_savingsLabel setText:@"Loading..."];
+    [_savingsLabel setFont:[UIFont fontWithName:@"RobotoSlab-Bold" size:15]];
     [_savingsView addSubview:_savingsLabel];
     
     _detailButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_detailButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-100, 3,70, kFooterHeight-3)];
+    [_detailButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-100, 2,70, kFooterHeight-3)];
     [_detailButton setTitle:@"DETAILS" forState:UIControlStateNormal];
-    [_detailButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:12]];
-    [_detailButton.titleLabel setTextColor:[UIColor whiteColor]];
+    [_detailButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed-Regular" size:14]];
+    [_detailButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [_detailButton addTarget:self action:@selector(tappedDetailButton) forControlEvents:UIControlEventTouchUpInside];
     [_savingsView addSubview:_detailButton];
     
-    _arrowButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_arrowButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-30, 3,30, kFooterHeight-3)];
-    [_arrowButton setTitle:@"^" forState:UIControlStateNormal];
-    [_arrowButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
-    [_arrowButton.titleLabel setTextColor:[UIColor whiteColor]];
+    _arrowButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_arrowButton setFrame:CGRectMake(CGRectGetMaxX(self.view.frame)-40, 3,28, kFooterHeight-8)];
+    
+//    [_arrowButton setTitle:@"^" forState:UIControlStateNormal];
+    [_arrowButton setImage:[UIImage imageNamed:@"arrow-up"] forState:UIControlStateNormal];
+//    [_arrowButton.titleLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:20]];
+//    [_arrowButton.titleLabel setTextColor:[UIColor whiteColor]];
     [_arrowButton addTarget:self action:@selector(tappedDetailButton) forControlEvents:UIControlEventTouchUpInside];
     [_savingsView addSubview:_arrowButton];
     
@@ -1029,6 +1034,9 @@
     [_priceItButton addTarget:self action:@selector(priceIt) forControlEvents:UIControlEventTouchUpInside];
     //    [_priceItButton setAlpha:0];
     [self setupPricingView];
+    [_savingsView setAlpha:0];
+    [_loadingLabel setText:@"Browse to a product to start pricing"];
+    [_loadingView setAlpha:1];
     [_footerView addSubview:_loadingView];
 
 }
@@ -1102,7 +1110,7 @@
     [_progressBar setFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), 5)];
     [_progressBar setProgressTintColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
     [_loadingView setBackgroundColor:[UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]];
-    _loadingLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 8, CGRectGetWidth(self.view.frame), kFooterHeight-10)];
+    _loadingLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 6, CGRectGetWidth(self.view.frame), kFooterHeight-10)];
     [_loadingLabel setText:@"PRICING RIGHT NOW"];
     [_loadingLabel setTextColor:[UIColor colorWithRed:0.47 green:0.47 blue:0.47 alpha:1.0]];
     [_loadingLabel setFont:[UIFont fontWithName:@"AvenirNextCondensed" size:14]];
@@ -1676,6 +1684,12 @@
         [_savingsLabel setText:[NSString stringWithFormat:@"SAVE $%.02f",savings]];
     else [_savingsLabel setText:[NSString stringWithFormat:@"Earn %i Price Points",points]];
     
+    _pricing = NO;
+    [_loadingView setAlpha:0];
+    _progress = 0;
+    [_savingsView setAlpha:1];
+    [_savingsView setBackgroundColor:[UIColor colorWithRed:0.12 green:0.78 blue:0.59 alpha:1.0]];
+   
 }
 
 -(void)gotStatusCode:(int)statusCode {

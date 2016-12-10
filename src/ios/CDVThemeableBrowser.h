@@ -62,6 +62,8 @@
 @property (nonatomic) BOOL fullscreen;
 @property (nonatomic) NSString *logoUrl;
 @property (nonatomic) BOOL showPriceIt, openedFromPdp;
+@property (nonatomic) int price_points;
+@property (nonatomic) float percentage_saved;
 
 
 @end
